@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Nuevo Proyecto</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen p-10">
+    <div class="max-w-xl mx-auto bg-white p-8 rounded-lg shadow-lg">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">
+          ✨ Crear Nuevo Proyecto
+        </h1>
+        <a href="/" class="text-blue-600 hover:underline">Volver</a>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-4">
+          <label class="block text-gray-700 font-bold mb-2"
+            >Nombre del Proyecto / Lote</label
+          >
+          {{ form.titulo }}
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-gray-700 font-bold mb-2"
+            >Asignar Analista</label
+          >
+          {{ form.analista_asignado }}
+          <p class="text-sm text-gray-500 mt-1">
+            Solo aparecen usuarios con perfil de Analista.
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition"
+        >
+          Guardar y Asignar
+        </button>
+      </form>
+    </div>
+  </body>
+</html>

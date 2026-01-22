@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Automatización Disolución</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 p-10">
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
+      <h1 class="text-3xl font-bold mb-2 text-blue-900">
+        Generador de Informes
+      </h1>
+      <p class="text-gray-500 mb-8">
+        Sube el Protocolo y la Propuesta para fusionarlos.
+      </p>
+
+      <form
+        method="post"
+        enctype="multipart/form-data"
+        class="mb-8 border-b pb-8"
+      >
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div
+            class="bg-blue-50 p-6 rounded-lg border-2 border-dashed border-blue-200 hover:border-blue-400 transition"
+          >
+            <label class="block mb-3 font-bold text-blue-800 text-lg"
+              >📄 1. Protocolo</label
+            >
+            <input
+              type="file"
+              name="archivo_protocolo"
+              accept=".docx"
+              class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+            />
+          </div>
+
+          <div
+            class="bg-purple-50 p-6 rounded-lg border-2 border-dashed border-purple-200 hover:border-purple-400 transition"
+          >
+            <label class="block mb-3 font-bold text-purple-800 text-lg"
+              >📄 2. Propuesta</label
+            >
+            <input
+              type="file"
+              name="archivo_propuesta"
+              accept=".docx"
+              class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+            />
+          </div>
+        </div>
+
+        <div class="flex gap-4 justify-center">
+          <button
+            type="submit"
+            name="verificar"
+            class="bg-gray-600 text-white px-8 py-3 rounded-lg hover:bg-gray-700 transition font-bold"
+          >
+            🔍 Verificar Datos
+          </button>
+
+          <button
+            type="submit"
+            name="generar_informe"
+            class="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition shadow-lg font-bold flex items-center gap-2"
+          >
+            🚀 Generar Informe Final
+          </button>
+        </div>
+      </form>
+
+      {% if datos %}
+      <div class="animate-fade-in-up">
+        <h2
+          class="text-xl font-bold mb-4 text-green-700 flex items-center gap-2"
+        >
+          ✅ Datos Fusionados ({% if datos|length > 0 %}{{ datos|length }}{%
+          else %}0{% endif %} encontrados)
+        </h2>
+
+        <div
+          class="overflow-x-auto bg-gray-50 rounded-lg border border-gray-200"
+        >
+          <table class="min-w-full">
+            <thead class="bg-gray-200">
+              <tr>
+                <th class="py-3 px-6 text-left text-gray-700">
+                  Tag (Etiqueta)
+                </th>
+                <th class="py-3 px-6 text-left text-gray-700">
+                  Valor Extraído
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              {% for tag, valor in datos.items %}
+              <tr class="hover:bg-white transition">
+                <td
+                  class="py-3 px-6 font-mono text-sm text-purple-600 font-bold"
+                >
+                  {{ tag }}
+                </td>
+                <td class="py-3 px-6 text-gray-800">{{ valor }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </body>
+</html>

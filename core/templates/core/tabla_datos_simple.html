@@ -1,0 +1,16 @@
+<div class="mt-2 bg-slate-50 rounded border border-slate-200 overflow-hidden">
+    <table class="w-full text-[10px]">
+        <tbody>
+            {% if datos %}
+                {% for tag, valor in datos|dictsort:0 %}
+                <tr class="border-b border-slate-100 last:border-0">
+                    <td class="px-2 py-1 text-slate-500 font-mono">{{ tag }}</td>
+                    <td class="px-2 py-1 font-bold text-right">{{ valor }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td class="p-2 text-center text-slate-400">Error al leer datos</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>

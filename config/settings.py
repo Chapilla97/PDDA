@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'core',
 ]
 
 MIDDLEWARE = [
@@ -74,8 +75,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'BD_Perfiles_Disolucion',  # <--- ¡Con comillas!
+        'USER': 'admin',                   # <--- ¡Con comillas!
+        'PASSWORD': 'TI4dm1n',             # <--- ¡Con comillas!
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
@@ -115,3 +120,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+# ... al final del archivo ...
+
+# A dónde vas al iniciar sesión
+LOGIN_REDIRECT_URL = '/'  
+# A dónde vas al cerrar sesión
+LOGOUT_REDIRECT_URL = '/accounts/login/'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

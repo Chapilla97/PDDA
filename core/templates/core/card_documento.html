@@ -1,0 +1,62 @@
+{% load custom_filters %}
+
+<div class="group bg-white rounded-lg border transition-all duration-200 p-4 relative 
+    {% if clave in proyecto.datos_validacion or clave in proyecto.datos_estudio %}
+        border-emerald-200 shadow-sm
+    {% else %}
+        border-slate-200 border-dashed hover:border-{{ color }}-400
+    {% endif %}">
+
+    <div class="flex justify-between items-start mb-2">
+        <h4 class="font-bold text-slate-700 text-xs">{{ nombre }}</h4>
+        
+        {% if clave in proyecto.datos_validacion or clave in proyecto.datos_estudio %}
+            <i class="fa-solid fa-check-circle text-emerald-500"></i>
+        {% endif %}
+    </div>
+
+    {% if clave in proyecto.datos_validacion or clave in proyecto.datos_estudio %}
+        <details class="w-full mt-2">
+            <summary class="text-[10px] font-bold text-slate-400 cursor-pointer hover:text-{{ color }}-600 uppercase tracking-wider">
+                Ver Datos
+            </summary>
+            
+            {% if parte == 'validacion' %}
+                {% with datos=proyecto.datos_validacion|get_item:clave %}
+                    {% include "core/tabla_datos_simple.html" %}
+                {% endwith %}
+            {% else %}
+                {% with datos=proyecto.datos_estudio|get_item:clave %}
+                    {% include "core/tabla_datos_simple.html" %}
+                {% endwith %}
+            {% endif %}
+
+            {% if proyecto.estado != 'terminado' %}
+            <form method="post" enctype="multipart/form-data" class="mt-2 text-right">
+                {% csrf_token %}
+                <input type="hidden" name="subir_archivo" value="true">
+                <input type="hidden" name="tipo_documento" value="{{ clave }}">
+                <input type="hidden" name="parte" value="{{ parte }}">
+                <label class="cursor-pointer text-[10px] text-blue-500 hover:underline">
+                    Reemplazar
+                    <input type="file" name="archivo" accept=".docx, .xlsx" class="hidden" onchange="this.form.submit()">
+                </label>
+            </form>
+            {% endif %}
+        </details>
+    
+    {% elif proyecto.estado != 'terminado' %}
+        <form method="post" enctype="multipart/form-data" class="mt-2">
+            {% csrf_token %}
+            <input type="hidden" name="subir_archivo" value="true">
+            <input type="hidden" name="tipo_documento" value="{{ clave }}">
+            <input type="hidden" name="parte" value="{{ parte }}">
+            <label class="cursor-pointer flex items-center justify-center gap-2 w-full py-2 bg-slate-50 hover:bg-{{ color }}-50 text-slate-400 hover:text-{{ color }}-600 rounded text-xs font-bold border border-transparent hover:border-{{ color }}-200 transition-all">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Cargar
+                <input type="file" name="archivo" accept=".docx, .xlsx" class="hidden" onchange="this.form.submit()">
+            </label>
+        </form>
+    {% else %}
+        <p class="text-[10px] text-slate-400 mt-2 italic text-center">Sin cargar</p>
+    {% endif %}
+</div>
