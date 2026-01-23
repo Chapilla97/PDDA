@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import user_passes_test
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
@@ -115,6 +116,16 @@ def extraer_tags_de_archivo(archivo_en_memoria):
     print(f"--- FIN: {len(datos_encontrados)} variables extraídas ---\n")
     return datos_encontrados
 # --- VISTAS ---
+@user_passes_test(lambda u: u.is_superuser)
+def eliminar_proyecto(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, pk=proyecto_id)
+    if request.method == 'POST':
+        titulo = proyecto.titulo
+        proyecto.delete()
+        # Opcional: Crear un log huérfano o general avisando del borrado
+        print(f"Proyecto {titulo} eliminado por {request.user.username}")
+        return redirect('lista_proyectos')
+    return redirect('lista_proyectos')
 
 @login_required
 def lista_proyectos(request):
@@ -232,3 +243,36 @@ def generar_documento_descarga(contexto_datos):
     response['Content-Disposition'] = 'attachment; filename="Informe_Final_Completo.docx"'
     doc.save(response)
     return response
+@login_required
+def generar_informe_validacion(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, pk=proyecto_id)
+    
+    # Ruta a tu plantilla existente
+    ruta_plantilla = os.path.join(settings.BASE_DIR, 'Plantilla_Validacion.docx')
+    
+    if not os.path.exists(ruta_plantilla):
+        return HttpResponse("Error: No encuentro 'Plantilla_Validacion.docx' en la carpeta raíz.", status=404)
+
+    # Recopilar solo datos de validación
+    datos_validacion = {}
+    for doc in proyecto.datos_validacion.values():
+        if isinstance(doc, dict):
+            datos_validacion.update(doc)
+    
+    # Sanitizar datos para Word
+    contexto = {k: str(v) for k, v in datos_validacion.items()}
+
+    try:
+        doc = DocxTemplate(ruta_plantilla)
+        doc.render(contexto)
+        
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+        nombre_archivo = f"Borrador_Validacion_{proyecto.titulo}.docx"
+        response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+        doc.save(response)
+        
+        registrar_log(proyecto, request.user, "Generó Borrador de Informe Validación")
+        return response
+
+    except Exception as e:
+        return HttpResponse(f"Error generando Word: {e}", status=500)

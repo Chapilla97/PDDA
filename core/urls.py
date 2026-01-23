@@ -10,4 +10,6 @@ urlpatterns = [
     
     # Ruta para ver el detalle y subir archivos (La nueva "inicio")
     path('proyecto/<int:proyecto_id>/', views.detalle_proyecto, name='detalle_proyecto'),
+    path('eliminar/<int:proyecto_id>/', views.eliminar_proyecto, name='eliminar_proyecto'),
+    path('generar-validacion/<int:proyecto_id>/', views.generar_informe_validacion, name='generar_informe_validacion'),
 ]
