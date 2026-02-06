@@ -2,7 +2,7 @@
     <table class="w-full text-[10px]">
         <tbody>
             {% if datos %}
-                {% for tag, valor in datos|dictsort:0 %}
+                {% for tag, valor in datos.items|dictsort:0 %}
                 <tr class="border-b border-slate-100 last:border-0">
                     <td class="px-2 py-1 text-slate-500 font-mono">{{ tag }}</td>
                     <td class="px-2 py-1 font-bold text-right">{{ valor }}</td>

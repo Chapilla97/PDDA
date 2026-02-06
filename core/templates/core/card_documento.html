@@ -16,6 +16,7 @@
     </div>
 
     {% if clave in proyecto.datos_validacion or clave in proyecto.datos_estudio %}
+        
         <details class="w-full mt-2">
             <summary class="text-[10px] font-bold text-slate-400 cursor-pointer hover:text-{{ color }}-600 uppercase tracking-wider">
                 Ver Datos
@@ -24,39 +25,106 @@
             {% if parte == 'validacion' %}
                 {% with datos=proyecto.datos_validacion|get_item:clave %}
                     {% include "core/tabla_datos_simple.html" %}
+                    
+                    {% if proyecto.estado != 'terminado' %}
+                        <form method="post" enctype="multipart/form-data" class="mt-4 border-t pt-3 border-slate-100">
+                            {% csrf_token %}
+                            <input type="hidden" name="subir_archivo" value="true">
+                            <input type="hidden" name="tipo_documento" value="{{ clave }}">
+                            <input type="hidden" name="parte" value="{{ parte }}">
+                            
+                            {% if clave == '03_Estabilidad' %}
+                                <div class="mb-3 bg-slate-50 p-2 rounded border border-slate-200">
+                                    <p class="text-[10px] font-bold text-slate-600 mb-2 border-b pb-1">Apartado EAU (Manual)</p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label class="block text-[9px] text-slate-500">Horas</label>
+                                            <input type="text" name="estabilidad_eau_horas" value="{{ datos.estabilidad_eau_horas|default:'' }}" class="w-full text-[10px] border rounded px-1 py-0.5" placeholder="Ej. 24">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[9px] text-slate-500">% Prom. Inicial</label>
+                                            <input type="text" name="estabilidad_eau_p_inicial" value="{{ datos.estabilidad_eau_p_inicial|default:'' }}" class="w-full text-[10px] border rounded px-1 py-0.5" placeholder="%">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[9px] text-slate-500">% Prom. Final</label>
+                                            <input type="text" name="estabilidad_eau_p_final" value="{{ datos.estabilidad_eau_p_final|default:'' }}" class="w-full text-[10px] border rounded px-1 py-0.5" placeholder="%">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[9px] text-slate-500">Diferencia</label>
+                                            <input type="text" name="estabilidad_eau_diferencia" value="{{ datos.estabilidad_eau_diferencia|default:'' }}" class="w-full text-[10px] border rounded px-1 py-0.5" placeholder="Dif">
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            <label class="cursor-pointer text-[10px] text-blue-500 hover:underline block text-right mt-2">
+                                Actualizar Archivo y Datos
+                                <input type="file" name="archivo" accept=".docx, .xlsx" class="hidden" onchange="this.form.submit()">
+                            </label>
+                        </form>
+                    {% endif %}
                 {% endwith %}
+
             {% else %}
                 {% with datos=proyecto.datos_estudio|get_item:clave %}
                     {% include "core/tabla_datos_simple.html" %}
+                    
+                    {% if proyecto.estado != 'terminado' %}
+                    <form method="post" enctype="multipart/form-data" class="mt-4 border-t pt-3 border-slate-100">
+                        {% csrf_token %}
+                        <input type="hidden" name="subir_archivo" value="true">
+                        <input type="hidden" name="tipo_documento" value="{{ clave }}">
+                        <input type="hidden" name="parte" value="{{ parte }}">
+                        <label class="cursor-pointer text-[10px] text-blue-500 hover:underline block text-right mt-2">
+                            Actualizar Archivo y Datos
+                            <input type="file" name="archivo" accept=".docx, .xlsx" class="hidden" onchange="this.form.submit()">
+                        </label>
+                    </form>
+                    {% endif %}
                 {% endwith %}
-            {% endif %}
-
-            {% if proyecto.estado != 'terminado' %}
-            <form method="post" enctype="multipart/form-data" class="mt-2 text-right">
-                {% csrf_token %}
-                <input type="hidden" name="subir_archivo" value="true">
-                <input type="hidden" name="tipo_documento" value="{{ clave }}">
-                <input type="hidden" name="parte" value="{{ parte }}">
-                <label class="cursor-pointer text-[10px] text-blue-500 hover:underline">
-                    Reemplazar
-                    <input type="file" name="archivo" accept=".docx, .xlsx" class="hidden" onchange="this.form.submit()">
-                </label>
-            </form>
             {% endif %}
         </details>
     
     {% elif proyecto.estado != 'terminado' %}
+        
         <form method="post" enctype="multipart/form-data" class="mt-2">
             {% csrf_token %}
             <input type="hidden" name="subir_archivo" value="true">
             <input type="hidden" name="tipo_documento" value="{{ clave }}">
             <input type="hidden" name="parte" value="{{ parte }}">
+            
+            {% if clave == '03_Estabilidad' %}
+                <div class="mb-3 bg-slate-50 p-2 rounded border border-slate-200 text-left">
+                    <p class="text-[10px] font-bold text-slate-600 mb-2 border-b pb-1">Apartado EAU (Requerido)</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[9px] text-slate-500">Horas</label>
+                            <input type="text" name="estabilidad_eau_horas" class="w-full text-[10px] border rounded px-1 py-0.5" placeholder="Ej. 24" required>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] text-slate-500">% Inicial</label>
+                            <input type="text" name="estabilidad_eau_p_inicial" class="w-full text-[10px] border rounded px-1 py-0.5" placeholder="%" required>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] text-slate-500">% Final</label>
+                            <input type="text" name="estabilidad_eau_p_final" class="w-full text-[10px] border rounded px-1 py-0.5" placeholder="%" required>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] text-slate-500">Diferencia</label>
+                            <input type="text" name="estabilidad_eau_diferencia" class="w-full text-[10px] border rounded px-1 py-0.5" placeholder="Dif" required>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
             <label class="cursor-pointer flex items-center justify-center gap-2 w-full py-2 bg-slate-50 hover:bg-{{ color }}-50 text-slate-400 hover:text-{{ color }}-600 rounded text-xs font-bold border border-transparent hover:border-{{ color }}-200 transition-all">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Cargar
+                <i class="fa-solid fa-cloud-arrow-up"></i> Cargar Archivo
                 <input type="file" name="archivo" accept=".docx, .xlsx" class="hidden" onchange="this.form.submit()">
             </label>
         </form>
+
     {% else %}
         <p class="text-[10px] text-slate-400 mt-2 italic text-center">Sin cargar</p>
     {% endif %}
+
 </div>

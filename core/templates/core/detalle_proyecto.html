@@ -28,10 +28,10 @@
         </div>
         
         {% if proyecto.estado == 'en_proceso' %}
-        <form method="post" onsubmit="return confirm('¿Seguro que deseas finalizar el proyecto? Pasará a modo lectura.');">
+        <form method="post" id="form-finalizar">
             {% csrf_token %}
-            <button type="submit" name="finalizar_proyecto" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-black transition">
-                <i class="fa-solid fa-archive mr-1"></i> Mover a Terminados
+            <button type="submit" name="finalizar_proyecto" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-black transition flex items-center gap-2">
+                <i class="fa-solid fa-archive"></i> Mover a Terminados
             </button>
         </form>
         {% else %}
@@ -46,8 +46,128 @@
 
     <div class="max-w-[1600px] mx-auto p-6 grid grid-cols-1 xl:grid-cols-4 gap-8">
         
+        <div class="col-span-1 xl:col-span-4 mb-2">
+            {% with porcentaje=proyecto|calcular_progreso %}
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="flex justify-between items-end mb-3 z-10 relative">
+                    <div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Progreso del Estudio</span>
+                        <div class="text-3xl font-bold text-slate-700 leading-none">
+                            {{ porcentaje }}% 
+                            <span class="text-sm font-normal text-slate-400">Completado</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        {% if porcentaje == 100 %}
+                            <span class="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
+                                <i class="fa-solid fa-check-circle mr-1"></i> ¡Estudio Finalizado!
+                            </span>
+                        {% elif porcentaje >= 50 %}
+                            <span class="text-blue-500 font-bold text-sm"><i class="fa-solid fa-fire mr-1"></i> ¡Vas muy bien!</span>
+                        {% else %}
+                            <span class="text-slate-400 font-bold text-sm"><i class="fa-solid fa-rocket mr-1"></i> Iniciando...</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner">
+                    <div class="h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2
+                        {% if porcentaje == 100 %}bg-emerald-500{% else %}bg-gradient-to-r from-blue-400 to-indigo-600{% endif %}" 
+                        style="width: {{ porcentaje }}%">
+                        <div class="w-full h-full absolute top-0 left-0 bg-white opacity-10 animate-pulse"></div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between text-[10px] text-slate-400 mt-3 font-semibold uppercase tracking-wide">
+                    <span>Inicio</span>
+                    <span>Carga de Datos</span>
+                    <span>Generación de Informe</span>
+                    <span>Firma Final</span>
+                </div>
+            </div>
+            {% endwith %}
+        </div>
+        
         <div class="xl:col-span-3 space-y-8">
             
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <div class="flex items-center gap-3 mb-4 border-b pb-2">
+                    <div class="bg-orange-50 text-orange-600 p-2 rounded-lg"><i class="fa-solid fa-sliders"></i></div>
+                    <h3 class="text-lg font-bold text-slate-700">Configuración del Informe</h3>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="guardar_datos_generales" value="true">
+                    
+                    {% with gen=proyecto.datos_validacion.datos_generales %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Periodo de Validación</label>
+                            <div class="flex gap-2 items-center">
+                                <div class="w-1/2">
+                                    <span class="text-[10px] text-slate-400">Del:</span>
+                                    <input type="date" name="fecha_inicio" value="{{ gen.fecha_inicio }}" class="w-full text-sm border rounded px-2 py-1" required>
+                                </div>
+                                <div class="w-1/2">
+                                    <span class="text-[10px] text-slate-400">Al:</span>
+                                    <input type="date" name="fecha_fin" value="{{ gen.fecha_fin }}" class="w-full text-sm border rounded px-2 py-1" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Fecha de Emisión</label>
+                            <input type="date" name="fecha_emision" value="{{ gen.fecha_emision }}" class="w-full text-sm border rounded px-2 py-1" required>
+                        </div>
+
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Técnica Analítica</label>
+                            <div class="flex gap-6">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="tecnica" value="croma" class="accent-blue-600" {% if gen.tecnica == 'croma' %}checked{% endif %} required>
+                                    <span class="text-sm font-semibold text-slate-700">Cromatografía</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="tecnica" value="espectro" class="accent-purple-600" {% if gen.tecnica == 'espectro' %}checked{% endif %}>
+                                    <span class="text-sm font-semibold text-slate-700">Espectrofotometría</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Modelo del Equipo</label>
+                            <select name="equipo_modelo" class="w-full text-sm border rounded px-2 py-1.5 bg-white">
+                                <option value="" disabled selected>-- Selecciona --</option>
+                                <option value="Agilent 1260 Infinity II" {% if gen.equipo_modelo == 'Agilent 1260 Infinity II' %}selected{% endif %}>Agilent 1260 Infinity II</option>
+                                <option value="Waters Alliance e2695" {% if gen.equipo_modelo == 'Waters Alliance e2695' %}selected{% endif %}>Waters Alliance e2695</option>
+                                <option value="Shimadzu Prominence-i" {% if gen.equipo_modelo == 'Shimadzu Prominence-i' %}selected{% endif %}>Shimadzu Prominence-i</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Selectividad / Especificidad</label>
+                            <select id="select_selectividad" name="selectividad_opcion" class="w-full text-sm border rounded px-2 py-1.5 bg-white mb-2" onchange="actualizarTextoSelectividad()">
+                                <option value="" disabled {% if not gen.selectividad_opcion %}selected{% endif %}>-- Elige una justificación --</option>
+                                <option value="opcion1" {% if gen.selectividad_opcion == 'opcion1' %}selected{% endif %}>Opción 1: Sin interferencias (Estándar)</option>
+                                <option value="opcion2" {% if gen.selectividad_opcion == 'opcion2' %}selected{% endif %}>Opción 2: Con interferencias despreciables</option>
+                                <option value="opcion3" {% if gen.selectividad_opcion == 'opcion3' %}selected{% endif %}>Opción 3: Método indicativo de estabilidad</option>
+                            </select>
+                            
+                            <textarea id="texto_selectividad" name="selectividad_texto" rows="3" class="w-full text-sm border rounded p-2 text-slate-600 bg-slate-50 focus:bg-white transition">{{ gen.selectividad_texto }}</textarea>
+                        </div>
+                    </div>
+                    {% endwith %}
+
+                    <div class="mt-4 text-right">
+                        <button type="submit" class="bg-slate-800 text-white font-bold py-2 px-6 rounded-lg text-xs hover:bg-black transition shadow-lg">
+                            <i class="fa-solid fa-floppy-disk mr-2"></i> Guardar Configuración
+                        </button>
+                    </div>
+                </form>
+            </div>
+
             <section>
                 <div class="flex items-center gap-3 mb-4">
                     <div class="bg-indigo-50 text-indigo-600 p-2 rounded-lg"><i class="fa-solid fa-flask"></i></div>
@@ -59,6 +179,7 @@
                     {% endfor %}
                 </div>
             </section>
+            
             <div class="col-span-1 md:col-span-2 lg:col-span-3 mt-4 mb-8">
                 <div class="bg-indigo-50 rounded-xl border border-indigo-200 p-5 flex flex-col md:flex-row gap-6 items-center justify-between shadow-sm">
                     <div class="flex items-center gap-4">
@@ -86,7 +207,6 @@
                             <input type="hidden" name="subir_archivo" value="true">
                             <input type="hidden" name="tipo_documento" value="Informe_Val">
                             <input type="hidden" name="parte" value="validacion">
-                            
                             <label class="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs flex items-center gap-2 shadow-md transition-all whitespace-nowrap">
                                 <i class="fa-solid fa-upload"></i> 
                                 {% if 'Informe_Val' in proyecto.datos_validacion %}Reemplazar PDF{% else %}Subir Firmado{% endif %}
@@ -176,8 +296,80 @@
                     </table>
                 </div>
             </div>
-
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // 1. Configuración de Toasts
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
+
+        // 2. Disparar Toasts si hay mensajes
+        {% if messages %}
+            {% for message in messages %}
+                Toast.fire({
+                    icon: "{{ message.tags|default:'info' }}",
+                    title: "{{ message }}"
+                });
+            {% endfor %}
+        {% endif %}
+
+        // 3. Script para el Texto de Selectividad
+        const textosSelectividad = {
+            'opcion1': "El método demostró ser selectivo al no presentar interferencias en los tiempos de retención del analito principal, provenientes del diluyente o placebos analizados.",
+            'opcion2': "Se observaron picos pequeños en el tiempo de retención, pero su respuesta es inferior al 0.5% comparada con el estándar, por lo que se consideran despreciables.",
+            'opcion3': "El método es capaz de separar inequívocamente el principio activo de sus productos de degradación formados bajo condiciones de estrés (ácido, base, oxidación)."
+        };
+
+        function actualizarTextoSelectividad() {
+            const select = document.getElementById('select_selectividad');
+            const area = document.getElementById('texto_selectividad');
+            if (select && area) {
+                const valor = select.value;
+                if (textosSelectividad[valor]) {
+                    area.value = textosSelectividad[valor];
+                }
+            }
+        }
+
+        // 4. Lógica del Botón Finalizar
+        const btnFinalizar = document.querySelector('button[name="finalizar_proyecto"]');
+        if (btnFinalizar) {
+            btnFinalizar.addEventListener('click', function(e) {
+                e.preventDefault(); 
+                const form = this.closest('form');
+                Swal.fire({
+                    title: '¿Finalizar Proyecto?',
+                    text: "El proyecto se moverá al histórico y pasará a modo lectura. ¿Estás seguro?",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#10b981', 
+                    cancelButtonColor: '#64748b',  
+                    confirmButtonText: 'Sí, finalizar',
+                    cancelButtonText: 'Cancelar',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'finalizar_proyecto';
+                        hiddenInput.value = 'true';
+                        form.appendChild(hiddenInput);
+                        form.submit();
+                    }
+                });
+            });
+        }
+    </script>
 </body>
 </html>
