@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><title>Usuarios del Sistema</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style> body { font-family: 'Inter', sans-serif; } </style>
+</head>
+<body class="bg-slate-100 p-10 min-h-screen">
+    <div class="max-w-5xl mx-auto">
+        
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">Gestión de Personal</h1>
+                <p class="text-sm text-slate-500">Administra quién tiene acceso al LIMS.</p>
+            </div>
+            <div class="flex gap-3">
+                <a href="{% url 'lista_proyectos' %}" class="px-4 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-sm transition">
+                    <i class="fa-solid fa-arrow-left"></i> Volver al Dashboard
+                </a>
+                <a href="{% url 'crear_usuario_nuevo' %}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow-md transition font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus"></i> Registrar Personal
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Usuario</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre Completo</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rol Asignado</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Acceso al Sistema</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Fecha Registro</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for u in usuarios %}
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-4 font-mono text-sm text-slate-600 font-bold">
+                            {{ u.username }}
+                        </td>
+                        <td class="p-4 text-sm text-slate-700">
+                            {{ u.first_name }} {{ u.last_name }}
+                        </td>
+                        <td class="p-4">
+                            {% if u.is_superuser %}
+                                <span class="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full text-xs font-bold border border-purple-200">
+                                    <i class="fa-solid fa-shield-halved mr-1"></i> Administrador
+                                </span>
+                            {% else %}
+                                {% for group in u.groups.all %}
+                                    {% if group.name == 'Calidad' %}
+                                        <span class="bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-200">
+                                            <i class="fa-solid fa-clipboard-check mr-1"></i> Calidad
+                                        </span>
+                                    {% elif group.name == 'Analistas' %}
+                                        <span class="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-xs font-bold border border-blue-200">
+                                            <i class="fa-solid fa-flask mr-1"></i> Analista
+                                        </span>
+                                    {% else %}
+                                        <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">{{ group.name }}</span>
+                                    {% endif %}
+                                {% empty %}
+                                    <span class="text-slate-400 text-xs italic">(Sin Rol Asignado)</span>
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                        <td class="p-4 text-center">
+                            {% if u.has_usable_password %}
+                                <span class="text-emerald-500 bg-emerald-50 px-2 py-1 rounded text-xs font-bold">
+                                    <i class="fa-solid fa-lock-open"></i> Permitido
+                                </span>
+                            {% else %}
+                                <span class="text-slate-400 bg-slate-100 px-2 py-1 rounded text-xs font-bold">
+                                    <i class="fa-solid fa-ban"></i> Sin Acceso
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="p-4 text-right text-xs text-slate-400">
+                            {{ u.date_joined|date:"d M Y" }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="mt-4 bg-blue-50 text-blue-700 p-4 rounded-lg text-sm border border-blue-100 flex items-start gap-3">
+            <i class="fa-solid fa-circle-info mt-0.5"></i>
+            <div>
+                <p class="font-bold">Información de Roles:</p>
+                <ul class="list-disc list-inside mt-1 space-y-1 text-xs">
+                    <li><b>Administradores:</b> Tienen control total.</li>
+                    <li><b>Calidad:</b> Tienen contraseña y pueden gestionar proyectos.</li>
+                    <li><b>Analistas:</b> NO tienen contraseña (no pueden entrar al sistema), solo sirven para ser asignados a proyectos.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

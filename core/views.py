@@ -1,3 +1,11 @@
+import matplotlib
+matplotlib.use('Agg') # Importante para servidores web
+import matplotlib.pyplot as plt
+from docxtpl import InlineImage
+from docx.shared import Mm
+import io
+import math  # <--- ¡ESTE ERA EL QUE FALTABA!
+
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import user_passes_test
@@ -9,30 +17,33 @@ from docxtpl import DocxTemplate
 from docx import Document
 import openpyxl
 import os
-from .models import Proyecto, RegistroActividad 
-from .forms import ProyectoForm
+from .models import Proyecto, RegistroActividad, Equipo, JustificacionSelectividad
+from .forms import ProyectoForm, CrearUsuarioForm
 import locale
 from datetime import datetime
-from django.contrib.auth.models import User
-from jinja2 import Environment, Undefined # <--- IMPORTANTE PARA LIMPIAR VARIABLES VACÍAS
+from django.contrib.auth.models import User, Group
+from jinja2 import Environment, Undefined
+from django.db.models import Q
+from django.template.loader import get_template
+from xhtml2pdf import pisa
 
-# --- CONFIGURACIÓN DE LOCALE (FECHAS EN ESPAÑOL) ---
+# Configuración Locale
 try:
     locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8') 
 except:
     try:
-        locale.setlocale(locale.LC_TIME, 'Spanish_Spain') # Intento para Windows
+        locale.setlocale(locale.LC_TIME, 'Spanish_Spain')
     except:
         pass
 
-# --- MOTOR DE EXTRACCIÓN (Igual que antes) ---
+# --- MOTOR DE EXTRACCIÓN ---
 def extraer_tags_de_archivo(archivo_en_memoria):
     nombre_archivo = archivo_en_memoria.name.lower()
     datos_encontrados = {}
+    
+    # Errores a limpiar
+    ERRORES_EXCEL = ['#DIV/0!', '#N/A', '#VALUE!', '#REF!', '#NAME?', '#NUM!', '#NULL!', 'nan']
 
-    print(f"\n--- 🕵️ INICIANDO ANÁLISIS DE: {nombre_archivo} ---")
-
-    # --- CASO 1: WORD (.docx) ---
     if nombre_archivo.endswith('.docx'):
         try:
             document = Document(archivo_en_memoria)
@@ -47,65 +58,70 @@ def extraer_tags_de_archivo(archivo_en_memoria):
                             sdt_content = element.find(namespace + 'sdtContent')
                             texto = "".join([t.text for t in sdt_content.iter(namespace + 't') if t.text]) if sdt_content else ""
                             datos_encontrados[tag_name] = texto
-        except Exception as e:
-            print(f"Error DOCX: {e}")
+        except Exception: pass
 
-    # --- CASO 2: EXCEL (.xlsx) ---
     elif nombre_archivo.endswith('.xlsx'):
         try:
             wb = openpyxl.load_workbook(archivo_en_memoria, data_only=True)
             hojas_reales = wb.sheetnames
-            
             for nombre_rango, objeto_definicion in wb.defined_names.items():
-                if nombre_rango.startswith('_xlnm') or nombre_rango.startswith('Print_Area'):
-                    continue
-
+                if nombre_rango.startswith('_xlnm') or nombre_rango.startswith('Print_Area'): continue
                 try:
-                    try:
-                        destinations = list(objeto_definicion.destinations)
-                    except:
-                        continue
-
+                    try: destinations = list(objeto_definicion.destinations)
+                    except: continue
                     for sheet_title, coord in destinations:
                         sheet_title_clean = sheet_title.strip("'")
-                        
                         if sheet_title_clean not in hojas_reales:
-                            if len(hojas_reales) == 1:
-                                ws = wb[hojas_reales[0]]
-                            else:
-                                continue
-                        else:
-                            ws = wb[sheet_title_clean]
-                        
-                        celda_limpia = coord.replace('$', '')
-                        if ':' in celda_limpia:
-                            celda_limpia = celda_limpia.split(':')[0]
-                            
+                            if len(hojas_reales) == 1: ws = wb[hojas_reales[0]]
+                            else: continue
+                        else: ws = wb[sheet_title_clean]
+                        celda_limpia = coord.replace('$', '').split(':')[0]
                         try:
                             cell = ws[celda_limpia]
                             valor = cell.value
-                            
                             fmt = cell.number_format
-                            if isinstance(valor, (int, float)):
-                                if '%' in fmt: valor = f"{valor * 100:.2f}%"
-                                elif '0.0000' in fmt: valor = f"{valor:.4f}"
-                                elif '0.000' in fmt: valor = f"{valor:.3f}"
-                                elif '0.00' in fmt: valor = f"{valor:.2f}"
-                                elif '0.0' in fmt: valor = f"{valor:.1f}"
-                                elif fmt == '0': valor = f"{valor:.0f}"
-                                else: valor = round(valor, 4)
                             
-                            val_str = str(valor) if valor is not None else ""
-                            datos_encontrados[nombre_rango] = val_str
-                        except Exception:
-                            pass 
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"Error General XLSX: {e}")
-
+                            # 1. LIMPIEZA DE ERRORES
+                            val_str_check = str(valor).strip().upper() if valor is not None else ""
+                            if any(error in val_str_check for error in ERRORES_EXCEL):
+                                valor = "" 
+                            
+                            # 2. LÓGICA "LO QUE VEO EN EXCEL"
+                            elif isinstance(valor, (int, float)):
+                                # A. Porcentajes
+                                if fmt and '%' in fmt:
+                                    valor = f"{valor * 100:.2f}%"
+                                
+                                # B. Formatos Numéricos (0.00, 0.0000, etc.)
+                                elif fmt and ('0.' in fmt or '.' in fmt):
+                                    # Intentamos contar cuántos ceros hay después del punto en el formato
+                                    # Ej: "0.00" -> 2 decimales, "0.0000" -> 4 decimales
+                                    try:
+                                        if '.' in fmt:
+                                            parte_decimal = fmt.split('.')[1]
+                                            # Contamos ceros y hashtags (#) como indicadores de posición
+                                            decimales = 0
+                                            for char in parte_decimal:
+                                                if char in ['0', '#', '?']: decimales += 1
+                                                else: break # Paramos al encontrar comillas u otros caracteres
+                                            
+                                            # Aplicamos formato exacto
+                                            valor = f"{valor:.{decimales}f}"
+                                        else:
+                                            # Fallback si el formato es raro pero numérico
+                                            valor = str(valor)
+                                    except:
+                                        valor = str(valor)
+                                
+                                # C. General / Enteros
+                                else:
+                                    valor = str(valor)
+                            
+                            datos_encontrados[nombre_rango] = str(valor) if valor is not None else ""
+                        except: pass 
+                except: pass
+        except Exception: pass
     return datos_encontrados
-
 # --- VISTAS ---
 @user_passes_test(lambda u: u.is_superuser)
 def eliminar_proyecto(request, proyecto_id):
@@ -113,38 +129,49 @@ def eliminar_proyecto(request, proyecto_id):
     if request.method == 'POST':
         titulo = proyecto.titulo
         proyecto.delete()
-        messages.error(request, f"🗑️ Proyecto '{titulo}' eliminado correctamente.")
-        return redirect('lista_proyectos')
+        messages.error(request, f"🗑️ Proyecto '{titulo}' eliminado.")
     return redirect('lista_proyectos')
 
 @login_required
 def lista_proyectos(request):
-    proyectos = Proyecto.objects.all().order_by('-fecha_creacion')
-    return render(request, 'core/dashboard.html', {'proyectos': proyectos})
+    en_proceso = Proyecto.objects.filter(estado='en_proceso').order_by('-fecha_creacion')
+    terminados = Proyecto.objects.filter(estado='terminado').order_by('-fecha_creacion')
+    
+    busqueda = request.GET.get('q')
+    if busqueda:
+        terminados = terminados.filter(
+            Q(titulo__icontains=busqueda) | 
+            Q(nombre_analista__icontains=busqueda)
+        )
 
-# --- HELPER: REGISTRO DE AUDITORÍA ---
-def registrar_log(proyecto, usuario, accion):
+    return render(request, 'core/dashboard.html', {
+        'en_proceso': en_proceso,
+        'terminados': terminados,
+        'busqueda': busqueda
+    })
+
+def registrar_log(proyecto, usuario, accion, comentario=None):
     RegistroActividad.objects.create(
         proyecto=proyecto,
         usuario=usuario,
-        accion=accion
+        accion=accion,
+        comentario=comentario
     )
 
 @login_required
 def crear_proyecto(request):
-    # Paso 1: Obtener analistas para el selector
-    analistas = User.objects.filter(is_active=True).order_by('username')
-    
+    try:
+        grupo_analistas = Group.objects.get(name='Analistas')
+        analistas = grupo_analistas.user_set.filter(is_active=True).order_by('first_name')
+    except Group.DoesNotExist:
+        analistas = User.objects.filter(is_active=True).order_by('username')
+        
     if request.method == 'POST':
         titulo = request.POST.get('titulo')
         analista_id = request.POST.get('analista_id')
-        
         if titulo:
-            # Lógica para guardar el nombre bonito del analista
             analista_user = User.objects.get(pk=analista_id) if analista_id else None
-            nombre_analista = f"{analista_user.first_name} {analista_user.last_name}" if analista_user else "Sin asignar"
-            if analista_user and not analista_user.first_name: 
-                nombre_analista = analista_user.username 
+            nombre_analista = f"{analista_user.first_name} {analista_user.last_name}" if analista_user else (analista_user.username if analista_user else "Sin asignar")
             
             proyecto = Proyecto.objects.create(
                 titulo=titulo,
@@ -154,7 +181,6 @@ def crear_proyecto(request):
             registrar_log(proyecto, request.user, "Creó el proyecto")
             messages.success(request, "✨ Proyecto creado exitosamente.")
             return redirect('detalle_proyecto', proyecto_id=proyecto.id)
-            
     return render(request, 'core/crear_proyecto.html', {'analistas': analistas})
 
 @login_required
@@ -165,8 +191,7 @@ def detalle_proyecto(request, proyecto_id):
     docs_estudio = [('Factor_Similitud', 'Hoja: Factor Similitud'), ('Porcentaje_Disuelto', 'Hoja: % Disuelto'), ('Protocolo_Perfiles', 'Protocolo Perfiles'), ('Informe_Perfiles', 'Informe Perfiles')]
 
     if request.method == 'POST':
-        
-        # A. SUBIDA DE ARCHIVOS DE DATOS
+        # A. SUBIDA DE ARCHIVOS
         if 'subir_archivo' in request.POST and proyecto.estado != 'terminado':
             tipo_doc = request.POST.get('tipo_documento')
             parte = request.POST.get('parte')
@@ -174,160 +199,141 @@ def detalle_proyecto(request, proyecto_id):
             
             if archivo and tipo_doc:
                 datos = extraer_tags_de_archivo(archivo)
-                
-                # Caso Especial: Estabilidad (Datos Manuales)
                 if tipo_doc == '03_Estabilidad':
-                    campos_manuales = ['estabilidad_eau_horas', 'estabilidad_eau_p_inicial', 'estabilidad_eau_p_final', 'estabilidad_eau_diferencia']
-                    for campo in campos_manuales:
-                        valor = request.POST.get(campo)
-                        if valor:
-                            datos[campo] = valor
+                    campos = ['estabilidad_eau_horas', 'estabilidad_eau_p_inicial', 'estabilidad_eau_p_final', 'estabilidad_eau_diferencia']
+                    for c in campos: 
+                        if request.POST.get(c): datos[c] = request.POST.get(c)
                 
-                if parte == 'validacion':
-                    proyecto.datos_validacion[tipo_doc] = datos
-                elif parte == 'estudio':
-                    proyecto.datos_estudio[tipo_doc] = datos
+                if parte == 'validacion': proyecto.datos_validacion[tipo_doc] = datos
+                elif parte == 'estudio': proyecto.datos_estudio[tipo_doc] = datos
                 proyecto.save()
                 
-                registrar_log(proyecto, request.user, f"Subió/Actualizó documento: {tipo_doc}")
-                messages.success(request, f"✅ Documento {tipo_doc} cargado y datos extraídos.")
+                registrar_log(proyecto, request.user, f"Subió documento: {tipo_doc}")
+                messages.success(request, f"✅ Documento {tipo_doc} cargado.")
                 return redirect('detalle_proyecto', proyecto_id=proyecto.id)
 
-        # B. NUEVO: GUARDAR DATOS GENERALES (FECHAS Y TÉCNICA) -> PASOS 2 Y 3
+        # B. GUARDAR CONFIGURACIÓN
         if 'guardar_datos_generales' in request.POST:
             datos = {
                 'fecha_inicio': request.POST.get('fecha_inicio'),
                 'fecha_fin': request.POST.get('fecha_fin'),
                 'fecha_emision': request.POST.get('fecha_emision'),
-                'tecnica': request.POST.get('tecnica'), # 'croma' o 'espectro'
+                'tecnica': request.POST.get('tecnica'),
                 'equipo_modelo': request.POST.get('equipo_modelo'),
                 'selectividad_opcion': request.POST.get('selectividad_opcion'),
                 'selectividad_texto': request.POST.get('selectividad_texto'),
             }
-
-            # Lógica de Fechas
-            def formatear_fecha(str_fecha, tipo):
-                if not str_fecha: return ""
+            
+            def fmt_fecha(s, full=False):
                 try:
-                    dt = datetime.strptime(str_fecha, '%Y-%m-%d')
+                    dt = datetime.strptime(s, '%Y-%m-%d')
                     mes = dt.strftime('%B').capitalize()
-                    if tipo == 'periodo': return f"{dt.day}"
-                    elif tipo == 'completa': return f"{dt.day} de {mes} de {dt.year}"
-                except:
-                    return str_fecha
+                    return f"{dt.day} de {mes} de {dt.year}" if full else f"{dt.day}"
+                except: return s
 
-            # Periodo: "Del X al Y de Mes de Año"
-            f_ini = datos['fecha_inicio']
-            f_fin = datos['fecha_fin']
             try:
-                dt_ini = datetime.strptime(f_ini, '%Y-%m-%d')
-                dt_fin = datetime.strptime(f_fin, '%Y-%m-%d')
-                mes_fin = dt_fin.strftime('%B').capitalize()
-                datos['periodo_validacion_txt'] = f"Del {dt_ini.day} al {dt_fin.day} de {mes_fin} de {dt_fin.year}"
-            except:
-                datos['periodo_validacion_txt'] = ""
+                dt_i = datetime.strptime(datos['fecha_inicio'], '%Y-%m-%d')
+                dt_f = datetime.strptime(datos['fecha_fin'], '%Y-%m-%d')
+                mes_f = dt_f.strftime('%B').capitalize()
+                datos['periodo_validacion_txt'] = f"Del {dt_i.day} al {dt_f.day} de {mes_f} de {dt_f.year}"
+            except: datos['periodo_validacion_txt'] = ""
+            
+            datos['fecha_emision_txt'] = fmt_fecha(datos['fecha_emision'], True)
 
-            # Emisión
-            datos['fecha_emision_txt'] = formatear_fecha(datos['fecha_emision'], 'completa')
-
-            # Lógica de Técnica (Cromatografía vs Espectro)
             if datos['tecnica'] == 'croma':
-                atos['var_tecnica_nombre1'] = "Cromatografo"
-                datos['var_tecnica_nombre'] = "Cromatografía"
-                datos['var_tecnica_adj_pl'] = "Cromatográficas"
-                datos['var_tecnica_adj_sg'] = "Cromatográfico"
-                datos['var_unidades'] = "unidades de área"
-                datos['bloque_estabilidad_automuestreador'] = "Estabilidad en automuestreador"
-                
+                datos.update({
+                    'var_tecnica_nombre': "Cromatografía",
+                    'var_tecnica_adj_pl': "Cromatográficas",
+                    'var_tecnica_adj_sg': "Cromatográfico",
+                    'var_unidades': "unidades de área",
+                    'bloque_estabilidad_automuestreador': "Estabilidad en automuestreador"
+                })
             elif datos['tecnica'] == 'espectro':
-                datos['var_tecnica_nombre1'] = "Espectrofotometro"
-                datos['var_tecnica_nombre'] = "Espectrofotometría"
-                datos['var_tecnica_adj_pl'] = "Espectrofotométricas"
-                datos['var_tecnica_adj_sg'] = "Espectrofotométrico"
-                datos['var_unidades'] = "unidades de absorbancia"
-                datos['bloque_estabilidad_automuestreador'] = "" # Se borra en Espectro
-            
-            else:
-                datos['var_tecnica_nombre'] = ""
-                datos['var_tecnica_adj_pl'] = ""
-                datos['var_tecnica_adj_sg'] = ""
-                datos['var_unidades'] = ""
-                datos['bloque_estabilidad_automuestreador'] = ""
+                datos.update({
+                    'var_tecnica_nombre': "Espectrofotometría",
+                    'var_tecnica_adj_pl': "Espectrofotométricas",
+                    'var_tecnica_adj_sg': "Espectrofotométrico",
+                    'var_unidades': "unidades de absorbancia",
+                    'bloque_estabilidad_automuestreador': ""
+                })
 
-            # Guardar en el JSON del proyecto
-            if not isinstance(proyecto.datos_validacion, dict):
-                proyecto.datos_validacion = {}
-            
+            if not isinstance(proyecto.datos_validacion, dict): proyecto.datos_validacion = {}
             proyecto.datos_validacion['datos_generales'] = datos
             proyecto.save()
-            
-            registrar_log(proyecto, request.user, "Actualizó Datos Generales del Informe")
-            messages.success(request, "💾 Datos generales guardados y procesados.")
+            registrar_log(proyecto, request.user, "Actualizó Configuración del Informe")
+            messages.success(request, "💾 Configuración guardada.")
             return redirect('detalle_proyecto', proyecto_id=proyecto.id)
 
-        # C. GENERAR INFORME WORD (Estudio - Botón Derecho)
-        if 'generar_informe' in request.POST:
-            registrar_log(proyecto, request.user, "Generó el Informe Final (Word)")
+        # C. GENERAR INFORME DE ESTUDIO
+        if 'generar_informe_estudio' in request.POST:
+            registrar_log(proyecto, request.user, "Generó Borrador de Estudio")
             datos_finales = {**proyecto.datos_validacion, **proyecto.datos_estudio}
             datos_planos = {}
             for doc in datos_finales.values():
                 if isinstance(doc, dict): datos_planos.update(doc)
-            return generar_documento_descarga(datos_planos)
+            return generar_documento_descarga(datos_planos, proyecto.titulo)
 
-        # D. SUBIR PDF FINAL FIRMADO
+        # D. SUBIR PDF FINAL
         if 'subir_pdf_firmado' in request.POST:
-            archivo_pdf = request.FILES.get('archivo_pdf')
-            if archivo_pdf:
-                proyecto.informe_final_firmado = archivo_pdf
+            archivo = request.FILES.get('archivo_pdf')
+            if archivo:
+                proyecto.informe_final_firmado = archivo
                 proyecto.fecha_subida_firmado = timezone.now()
                 proyecto.save()
-                registrar_log(proyecto, request.user, "Subió el PDF Final Firmado")
-                messages.success(request, "🚀 ¡Felicidades! Informe firmado cargado. Proyecto Completado.")
+                registrar_log(proyecto, request.user, "Subió PDF Firmado Final")
+                messages.success(request, "🚀 Proyecto Completado.")
                 return redirect('detalle_proyecto', proyecto_id=proyecto.id)
 
-        # E. MOVER A TERMINADOS
+        # E. COMENTARIOS
+        if 'enviar_comentario' in request.POST:
+            texto = request.POST.get('comentario_texto')
+            if texto:
+                registrar_log(proyecto, request.user, "Comentario", texto)
+                messages.info(request, "💬 Comentario agregado.")
+                return redirect('detalle_proyecto', proyecto_id=proyecto.id)
+
+        # F. FINALIZAR / REACTIVAR
         if 'finalizar_proyecto' in request.POST:
             proyecto.estado = 'terminado'
             proyecto.save()
-            registrar_log(proyecto, request.user, "Finalizó el proyecto (Movido a Histórico)")
-            messages.info(request, "📦 Proyecto movido al histórico.")
+            registrar_log(proyecto, request.user, "Finalizó el proyecto")
             return redirect('lista_proyectos')
-            
-        # F. REACTIVAR
+        
         if 'reactivar_proyecto' in request.POST:
             proyecto.estado = 'en_proceso'
             proyecto.save()
             registrar_log(proyecto, request.user, "Reactivó el proyecto")
-            messages.warning(request, "⚠️ Proyecto reactivado para edición.")
             return redirect('detalle_proyecto', proyecto_id=proyecto.id)
-        
-    historial = proyecto.actividades.all().order_by('-fecha')
 
+    historial = proyecto.actividades.all().order_by('-fecha')
+    equipos = Equipo.objects.filter(activo=True)
+    justificaciones = JustificacionSelectividad.objects.filter(activo=True)
     return render(request, 'core/detalle_proyecto.html', {
         'proyecto': proyecto,
         'docs_validacion': docs_validacion,
         'docs_estudio': docs_estudio,
-        'historial': historial
+        'historial': historial,
+        'equipos': equipos,            
+        'justificaciones': justificaciones
     })
 
-def generar_documento_descarga(contexto_datos):
+def generar_documento_descarga(contexto_datos, titulo_proyecto=""):
     ruta_plantilla = os.path.join(settings.BASE_DIR, 'Plantilla_Informe.docx')
-    if not os.path.exists(ruta_plantilla):
-        return HttpResponse("Error: Falta la Plantilla_Informe.docx", status=404)
-
+    if not os.path.exists(ruta_plantilla): return HttpResponse("Falta Plantilla_Informe.docx", status=404)
+    
     doc = DocxTemplate(ruta_plantilla)
-    contexto_seguro = {k: str(v) for k, v in contexto_datos.items()}
-    doc.render(contexto_seguro)
+    contexto = {k: str(v) for k, v in contexto_datos.items()}
+    
+    jinja_env = Environment(undefined=SilentUndefined)
+    doc.render(contexto, jinja_env)
     
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    response['Content-Disposition'] = 'attachment; filename="Informe_Final_Completo.docx"'
+    response['Content-Disposition'] = f'attachment; filename="Informe_Validacion_Estudio_{titulo_proyecto}.docx"'
     doc.save(response)
     return response
 
-# --- CLASE HELPER PARA VARIABLES VACÍAS ---
 class SilentUndefined(Undefined):
-    def __str__(self):
-        return ""
+    def __str__(self): return ""
 
 @login_required
 def generar_informe_validacion(request, proyecto_id):
@@ -335,28 +341,130 @@ def generar_informe_validacion(request, proyecto_id):
     ruta_plantilla = os.path.join(settings.BASE_DIR, 'Plantilla_Validacion.docx')
     
     if not os.path.exists(ruta_plantilla):
-        return HttpResponse("Error: No encuentro 'Plantilla_Validacion.docx' en la carpeta raíz.", status=404)
+        return HttpResponse("Error: No encuentro 'Plantilla_Validacion.docx'", status=404)
 
-    # 1. Recopilar datos de Validación (Excels)
-    datos_finales = {}
-    if proyecto.datos_validacion and isinstance(proyecto.datos_validacion, dict):
+    # Recopilar datos
+    datos = {}
+    if proyecto.datos_validacion:
         for doc in proyecto.datos_validacion.values():
-            if isinstance(doc, dict):
-                datos_finales.update(doc)
-    
-    # 2. Asegurar que los datos generales estén incluidos
-    if proyecto.datos_validacion and 'datos_generales' in proyecto.datos_validacion:
-        datos_finales.update(proyecto.datos_validacion['datos_generales'])
+            if isinstance(doc, dict): datos.update(doc)
+    if 'datos_generales' in proyecto.datos_validacion:
+        datos.update(proyecto.datos_validacion['datos_generales'])
 
-    # 3. Sanitizar
-    contexto = {k: str(v) for k, v in datos_finales.items()}
+    contexto = {k: str(v) for k, v in datos.items()}
 
     try:
         doc = DocxTemplate(ruta_plantilla)
-        
-        # 4. CONFIGURAR JINJA2 PARA LIMPIAR VARIABLES VACÍAS (Paso 4)
         jinja_env = Environment(undefined=SilentUndefined)
+
+        # --- FUNCIÓN HELPER PARA GENERAR GRÁFICAS ---
+        # Esto evita repetir código 3 veces. Es más limpio.
+        def crear_grafica_linealidad(prefijo_conc, prefijo_resp, prefijo_resul):
+            try:
+                plt.figure(figsize=(6.5, 4.5))
+                colores = ['#005a87', '#00a3e0', '#63c0f5'] 
+                todos_los_y = []
+                
+                # A. Puntos dispersos
+                for c in range(1, 4): # Hasta 3 curvas
+                    x_vals = []
+                    y_vals = []
+                    for n in range(1, 7): 
+                        # --- CORRECCIÓN AQUÍ ---
+                        # Si es LM (Referencia/Prueba), agregamos "respuesta_" al nombre
+                        if prefijo_resp == "lm":
+                             key_resp = f"{prefijo_resp}_c{c}_n{n}_respuesta_{prefijo_resul}" # Ej: lm_c1_n1_respuesta_ref
+                        else:
+                             key_resp = f"{prefijo_resp}_c{c}_n{n}_{prefijo_resul}" # Ej: ls_c1_n1_respuesta
+
+                        # Construcción del Tag de Concentración
+                        if "ls" in prefijo_conc: 
+                            key_conc = f"{prefijo_conc}_1_{n}_concentracion"
+                        else: 
+                            key_conc = f"{prefijo_conc}_{n}_concentracion_{prefijo_resul}"
+
+                        if key_resp in datos and key_conc in datos:
+                            try:
+                                val_x = float(datos[key_conc])
+                                val_y = float(datos[key_resp])
+                                x_vals.append(val_x)
+                                y_vals.append(val_y)
+                                todos_los_y.append(val_y)
+                            except ValueError: continue
+                    
+                    if x_vals and y_vals:
+                        plt.scatter(x_vals, y_vals, color=colores[c-1], marker='D', s=40, alpha=0.7, edgecolors='black', linewidths=0.5)
+
+                # B. Línea de tendencia
+                try:
+                    if "ls" in prefijo_conc:
+                        pendiente = float(datos.get('ls_pendiente', 0))
+                        intercepto = float(datos.get('ls_intercepto', 0))
+                    else:
+                        # Aquí sí usamos solo el prefijo (ej: lm_pendiente_ref)
+                        pendiente = float(datos.get(f'{prefijo_conc}_pendiente_{prefijo_resul}', 0))
+                        intercepto = float(datos.get(f'{prefijo_conc}_intercepto_{prefijo_resul}', 0))
+                    
+                    concs_teoricas = []
+                    for n in range(1, 7):
+                        try: 
+                            if "ls" in prefijo_conc: k = f"{prefijo_conc}_1_{n}_concentracion"
+                            else: k = f"{prefijo_conc}_{n}_concentracion_{prefijo_resul}"
+                            concs_teoricas.append(float(datos.get(k, 0)))
+                        except: pass
+                    
+                    if concs_teoricas:
+                        x_line = [min(concs_teoricas), max(concs_teoricas)]
+                        y_line = [(m * pendiente + intercepto) for m in x_line]
+                        plt.plot(x_line, y_line, color='black', linewidth=1.5, linestyle='-')
+                        
+                        signo = "+" if intercepto >= 0 else ""
+                        texto_ec = f'y = {pendiente:.4f}x {signo} {intercepto:.4f}'
+                        plt.text(min(concs_teoricas) + 1, max(y_line)*0.9, texto_ec, fontsize=11, color='#333')
+
+                except Exception: pass
+
+                # C. Eje Y Dinámico
+                if todos_los_y:
+                    max_y_real = max(todos_los_y)
+                    limite_superior = math.ceil(max_y_real / 100) * 100
+                    plt.ylim(0, limite_superior)
+
+                # D. Estética
+                plt.xlabel('Concentración (µg/mL)', fontsize=9, fontweight='bold')
+                plt.ylabel('Respuesta (UA)', fontsize=9, fontweight='bold')
+                plt.grid(True, linestyle=':', alpha=0.5)
+                plt.tight_layout()
+                
+                buffer = io.BytesIO()
+                plt.savefig(buffer, format='png', dpi=150)
+                buffer.seek(0)
+                plt.close()
+                return InlineImage(doc, buffer, width=Mm(130))
+                
+            except Exception as e:
+                print(f"Error generando gráfica: {e}")
+                return None
+
+        # --- GENERAR LAS 3 GRÁFICAS ---
         
+        # 1. Fármaco (LS)
+        # Tags esperados: ls_c1_n1_respuesta, ls_1_1_concentracion
+        img_ls = crear_grafica_linealidad("ls", "ls", "respuesta") # El 3er arg es truco para coincidir con tu logica anterior
+        if img_ls: contexto['grafica_linealidad_farmaco'] = img_ls
+
+        # 2. Referencia (LM REF)
+        # Tags esperados: lm_c1_n1_respuesta_ref, lm_1_concentracion_ref
+        img_ref = crear_grafica_linealidad("lm", "lm", "ref")
+        if img_ref: contexto['grafica_linealidad_referencia'] = img_ref
+
+        # 3. Prueba (LM PBA)
+        # Tags esperados: lm_c1_n1_respuesta_pba, lm_1_concentracion_pba
+        img_pba = crear_grafica_linealidad("lm", "lm", "pba")
+        if img_pba: contexto['grafica_linealidad_prueba'] = img_pba
+
+        
+        # Renderizar y Guardar
         doc.render(contexto, jinja_env)
         
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
@@ -364,8 +472,61 @@ def generar_informe_validacion(request, proyecto_id):
         response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
         doc.save(response)
         
-        registrar_log(proyecto, request.user, "Generó Borrador de Informe Validación")
+        registrar_log(proyecto, request.user, "Generó Borrador Validación con 3 Gráficas")
         return response
 
     except Exception as e:
         return HttpResponse(f"Error generando Word: {e}", status=500)
+# --- USUARIOS ---
+@user_passes_test(lambda u: u.is_superuser)
+def administrar_usuarios(request):
+    usuarios = User.objects.all().order_by('-date_joined')
+    return render(request, 'core/lista_usuarios.html', {'usuarios': usuarios})
+
+@user_passes_test(lambda u: u.is_superuser)
+def crear_usuario_nuevo(request):
+    if request.method == 'POST':
+        form = CrearUsuarioForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            if User.objects.filter(username=data['username']).exists():
+                messages.error(request, "El nombre de usuario ya existe.")
+            else:
+                user = User.objects.create(
+                    username=data['username'],
+                    first_name=data['first_name'],
+                    last_name=data['last_name']
+                )
+                if data['rol'] == 'analista':
+                    user.set_unusable_password()
+                    group, _ = Group.objects.get_or_create(name='Analistas')
+                    user.groups.add(group)
+                    messages.success(request, f"👤 Analista {user.first_name} creado.")
+                elif data['rol'] == 'calidad':
+                    if not data['password']:
+                        messages.error(request, "Contraseña obligatoria.")
+                        user.delete()
+                        return render(request, 'core/crear_usuario.html', {'form': form})
+                    user.set_password(data['password'])
+                    group, _ = Group.objects.get_or_create(name='Calidad')
+                    user.groups.add(group)
+                    messages.success(request, f"🛡️ Usuario Calidad {user.first_name} creado.")
+                user.save()
+                return redirect('administrar_usuarios')
+    else:
+        form = CrearUsuarioForm()
+    return render(request, 'core/crear_usuario.html', {'form': form})
+
+@login_required
+def exportar_audit_trail_pdf(request, proyecto_id):
+    proyecto = get_object_or_404(Proyecto, pk=proyecto_id)
+    historial = proyecto.actividades.all().order_by('-fecha')
+    context = {'proyecto': proyecto, 'historial': historial}
+    template = get_template('core/pdf_audit_trail.html')
+    html = template.render(context)
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"AuditTrail_{proyecto.id}_{timezone.now().strftime('%Y%m%d')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err: return HttpResponse('Error PDF', status=500)
+    return response

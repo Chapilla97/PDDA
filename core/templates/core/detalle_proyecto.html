@@ -7,23 +7,21 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style> body { font-family: 'Inter', sans-serif; } </style>
+    <style> 
+        body { font-family: 'Inter', sans-serif; } 
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+    </style>
 </head>
 <body class="bg-slate-50 min-h-screen pb-40">
 
-    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 px-6 py-3 flex justify-between items-center">
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 px-6 py-3 flex justify-between items-center shadow-sm">
         <div class="flex items-center gap-4">
-            <a href="{% url 'lista_proyectos' %}" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+            <a href="{% url 'lista_proyectos' %}" class="text-slate-400 hover:text-slate-600 transition"><i class="fa-solid fa-arrow-left"></i> Volver</a>
             <div class="h-6 w-px bg-slate-300"></div>
             <div>
                 <h1 class="text-xl font-bold text-slate-800">{{ proyecto.titulo }}</h1>
-                <p class="text-xs text-slate-500">Analista: <span class="font-bold text-blue-600">{{ proyecto.nombre_analista|default:"Sin asignar" }}</span> | Estado: 
-                    {% if proyecto.estado == 'terminado' %}
-                        <span class="text-emerald-600 font-bold">TERMINADO</span>
-                    {% else %}
-                        <span class="text-blue-600 font-bold">EN PROCESO</span>
-                    {% endif %}
-                </p>
+                <p class="text-xs text-slate-500">Analista: <span class="font-bold text-blue-600">{{ proyecto.nombre_analista|default:"Sin asignar" }}</span></p>
             </div>
         </div>
         
@@ -31,15 +29,13 @@
         <form method="post" id="form-finalizar">
             {% csrf_token %}
             <button type="submit" name="finalizar_proyecto" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-black transition flex items-center gap-2">
-                <i class="fa-solid fa-archive"></i> Mover a Terminados
+                <i class="fa-solid fa-archive"></i> Finalizar Proyecto
             </button>
         </form>
         {% else %}
         <form method="post">
             {% csrf_token %}
-            <button type="submit" name="reactivar_proyecto" class="text-slate-400 text-xs hover:text-blue-600 hover:underline">
-                Reactivar Proyecto (Admin)
-            </button>
+            <button type="submit" name="reactivar_proyecto" class="text-slate-400 text-xs hover:text-blue-600 hover:underline">Reactivar (Admin)</button>
         </form>
         {% endif %}
     </nav>
@@ -51,202 +47,158 @@
             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
                 <div class="flex justify-between items-end mb-3 z-10 relative">
                     <div>
-                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Progreso del Estudio</span>
-                        <div class="text-3xl font-bold text-slate-700 leading-none">
-                            {{ porcentaje }}% 
-                            <span class="text-sm font-normal text-slate-400">Completado</span>
-                        </div>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Progreso Total</span>
+                        <div class="text-3xl font-bold text-slate-700 leading-none">{{ porcentaje }}% <span class="text-sm font-normal text-slate-400">Completado</span></div>
                     </div>
                     <div class="text-right">
                         {% if porcentaje == 100 %}
-                            <span class="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-                                <i class="fa-solid fa-check-circle mr-1"></i> ¡Estudio Finalizado!
-                            </span>
-                        {% elif porcentaje >= 50 %}
-                            <span class="text-blue-500 font-bold text-sm"><i class="fa-solid fa-fire mr-1"></i> ¡Vas muy bien!</span>
+                            <span class="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse"><i class="fa-solid fa-check-circle mr-1"></i> ¡Listo para Firma!</span>
                         {% else %}
-                            <span class="text-slate-400 font-bold text-sm"><i class="fa-solid fa-rocket mr-1"></i> Iniciando...</span>
+                            <span class="text-blue-500 font-bold text-sm"><i class="fa-solid fa-spinner fa-spin mr-1"></i> En Proceso</span>
                         {% endif %}
                     </div>
                 </div>
-                
                 <div class="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner">
-                    <div class="h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2
-                        {% if porcentaje == 100 %}bg-emerald-500{% else %}bg-gradient-to-r from-blue-400 to-indigo-600{% endif %}" 
-                        style="width: {{ porcentaje }}%">
-                        <div class="w-full h-full absolute top-0 left-0 bg-white opacity-10 animate-pulse"></div>
-                    </div>
-                </div>
-                
-                <div class="flex justify-between text-[10px] text-slate-400 mt-3 font-semibold uppercase tracking-wide">
-                    <span>Inicio</span>
-                    <span>Carga de Datos</span>
-                    <span>Generación de Informe</span>
-                    <span>Firma Final</span>
+                    <div class="h-full rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 {% if porcentaje == 100 %}bg-emerald-500{% else %}bg-gradient-to-r from-blue-400 to-indigo-600{% endif %}" style="width: {{ porcentaje }}%"></div>
                 </div>
             </div>
             {% endwith %}
         </div>
         
-        <div class="xl:col-span-3 space-y-8">
+        <div class="xl:col-span-3 space-y-6">
             
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex items-center gap-3 mb-4 border-b pb-2">
-                    <div class="bg-orange-50 text-orange-600 p-2 rounded-lg"><i class="fa-solid fa-sliders"></i></div>
-                    <h3 class="text-lg font-bold text-slate-700">Configuración del Informe</h3>
-                </div>
-
-                <form method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="guardar_datos_generales" value="true">
-                    
-                    {% with gen=proyecto.datos_validacion.datos_generales %}
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        
-                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Periodo de Validación</label>
-                            <div class="flex gap-2 items-center">
-                                <div class="w-1/2">
-                                    <span class="text-[10px] text-slate-400">Del:</span>
+            <details class="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" open>
+                <summary class="flex items-center justify-between p-5 cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-orange-100 text-orange-600 p-2 rounded-lg"><i class="fa-solid fa-sliders"></i></div>
+                        <h3 class="text-lg font-bold text-slate-700">1. Configuración del Informe</h3>
+                    </div>
+                    <i class="fa-solid fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform"></i>
+                </summary>
+                
+                <div class="p-5 border-t border-slate-200">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="guardar_datos_generales" value="true">
+                        {% with gen=proyecto.datos_validacion.datos_generales %}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-slate-50 p-3 rounded border border-slate-100">
+                                <label class="block text-xs font-bold text-slate-500 mb-2">Periodo Validación</label>
+                                <div class="flex gap-2">
                                     <input type="date" name="fecha_inicio" value="{{ gen.fecha_inicio }}" class="w-full text-sm border rounded px-2 py-1" required>
-                                </div>
-                                <div class="w-1/2">
-                                    <span class="text-[10px] text-slate-400">Al:</span>
                                     <input type="date" name="fecha_fin" value="{{ gen.fecha_fin }}" class="w-full text-sm border rounded px-2 py-1" required>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                            <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Fecha de Emisión</label>
-                            <input type="date" name="fecha_emision" value="{{ gen.fecha_emision }}" class="w-full text-sm border rounded px-2 py-1" required>
-                        </div>
-
-                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 md:col-span-2">
-                            <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Técnica Analítica</label>
-                            <div class="flex gap-6">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="tecnica" value="croma" class="accent-blue-600" {% if gen.tecnica == 'croma' %}checked{% endif %} required>
-                                    <span class="text-sm font-semibold text-slate-700">Cromatografía</span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="tecnica" value="espectro" class="accent-purple-600" {% if gen.tecnica == 'espectro' %}checked{% endif %}>
-                                    <span class="text-sm font-semibold text-slate-700">Espectrofotometría</span>
-                                </label>
+                            <div class="bg-slate-50 p-3 rounded border border-slate-100">
+                                <label class="block text-xs font-bold text-slate-500 mb-2">Fecha Emisión</label>
+                                <input type="date" name="fecha_emision" value="{{ gen.fecha_emision }}" class="w-full text-sm border rounded px-2 py-1" required>
                             </div>
-                        </div>
-
-                        <div>
+                            <div class="bg-slate-50 p-3 rounded border border-slate-100 md:col-span-2">
+                                <label class="block text-xs font-bold text-slate-500 mb-2">Técnica</label>
+                                <div class="flex gap-6">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="tecnica" value="croma" class="accent-blue-600" {% if gen.tecnica == 'croma' %}checked{% endif %} required>
+                                        <span class="text-sm">Cromatografía</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name="tecnica" value="espectro" class="accent-purple-600" {% if gen.tecnica == 'espectro' %}checked{% endif %}>
+                                        <span class="text-sm">Espectrofotometría</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Modelo del Equipo</label>
                             <select name="equipo_modelo" class="w-full text-sm border rounded px-2 py-1.5 bg-white">
                                 <option value="" disabled selected>-- Selecciona --</option>
-                                <option value="Agilent 1260 Infinity II" {% if gen.equipo_modelo == 'Agilent 1260 Infinity II' %}selected{% endif %}>Agilent 1260 Infinity II</option>
-                                <option value="Waters Alliance e2695" {% if gen.equipo_modelo == 'Waters Alliance e2695' %}selected{% endif %}>Waters Alliance e2695</option>
-                                <option value="Shimadzu Prominence-i" {% if gen.equipo_modelo == 'Shimadzu Prominence-i' %}selected{% endif %}>Shimadzu Prominence-i</option>
+                                {% for equipo in equipos %}
+                                    <option value="{{ equipo.nombre }}" {% if gen.equipo_modelo == equipo.nombre %}selected{% endif %}>
+                                        {{ equipo.nombre }}
+                                    </option>
+                                {% endfor %}
                             </select>
                         </div>
-
-                        <div class="md:col-span-2">
+                            <div class="md:col-span-2">
                             <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Selectividad / Especificidad</label>
                             <select id="select_selectividad" name="selectividad_opcion" class="w-full text-sm border rounded px-2 py-1.5 bg-white mb-2" onchange="actualizarTextoSelectividad()">
-                                <option value="" disabled {% if not gen.selectividad_opcion %}selected{% endif %}>-- Elige una justificación --</option>
-                                <option value="opcion1" {% if gen.selectividad_opcion == 'opcion1' %}selected{% endif %}>Opción 1: Sin interferencias (Estándar)</option>
-                                <option value="opcion2" {% if gen.selectividad_opcion == 'opcion2' %}selected{% endif %}>Opción 2: Con interferencias despreciables</option>
-                                <option value="opcion3" {% if gen.selectividad_opcion == 'opcion3' %}selected{% endif %}>Opción 3: Método indicativo de estabilidad</option>
+                                <option value="" disabled {% if not gen.selectividad_opcion %}selected{% endif %}>-- Justificación --</option>
+                                {% for just in justificaciones %}
+                                    <option value="{{ just.id }}" {% if gen.selectividad_opcion == just.id|stringformat:"i" %}selected{% endif %}>
+                                        {{ just.titulo }}
+                                    </option>
+                                {% endfor %}
                             </select>
-                            
-                            <textarea id="texto_selectividad" name="selectividad_texto" rows="3" class="w-full text-sm border rounded p-2 text-slate-600 bg-slate-50 focus:bg-white transition">{{ gen.selectividad_texto }}</textarea>
+                            <textarea id="texto_selectividad" name="selectividad_texto" rows="3" class="w-full text-sm border rounded p-2">{{ gen.selectividad_texto }}</textarea>
                         </div>
-                    </div>
-                    {% endwith %}
-
-                    <div class="mt-4 text-right">
-                        <button type="submit" class="bg-slate-800 text-white font-bold py-2 px-6 rounded-lg text-xs hover:bg-black transition shadow-lg">
-                            <i class="fa-solid fa-floppy-disk mr-2"></i> Guardar Configuración
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <section>
-                <div class="flex items-center gap-3 mb-4">
-                    <div class="bg-indigo-50 text-indigo-600 p-2 rounded-lg"><i class="fa-solid fa-flask"></i></div>
-                    <h3 class="text-lg font-bold text-slate-700">Validación</h3>
+                        </div>
+                        {% endwith %}
+                        <div class="mt-4 text-right">
+                            <button type="submit" class="bg-slate-800 text-white font-bold py-2 px-6 rounded-lg text-xs hover:bg-black transition">Guardar Configuración</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {% for clave, nombre in docs_validacion %}
-                        {% include "core/card_documento.html" with clave=clave nombre=nombre parte="validacion" color="blue" %}
-                    {% endfor %}
-                </div>
-            </section>
-            
-            <div class="col-span-1 md:col-span-2 lg:col-span-3 mt-4 mb-8">
-                <div class="bg-indigo-50 rounded-xl border border-indigo-200 p-5 flex flex-col md:flex-row gap-6 items-center justify-between shadow-sm">
-                    <div class="flex items-center gap-4">
-                        <div class="bg-indigo-100 text-indigo-600 p-3 rounded-full">
-                            <i class="fa-solid fa-file-contract text-2xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-indigo-900 text-lg">Informe de Validación</h3>
-                            <p class="text-xs text-indigo-600 max-w-md">
-                                Genera el borrador automático con los datos cargados. Fírmalo y sube el PDF final aquí.
-                            </p>
-                        </div>
+            </details>
+
+            <details class="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" open>
+                <summary class="flex items-center justify-between p-5 cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-indigo-100 text-indigo-600 p-2 rounded-lg"><i class="fa-solid fa-flask"></i></div>
+                        <h3 class="text-lg font-bold text-slate-700">2. Documentos de Validación</h3>
                     </div>
-            
-                    <div class="flex gap-3 w-full md:w-auto">
+                    <i class="fa-solid fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform"></i>
+                </summary>
+                
+                <div class="p-5 border-t border-slate-200">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        {% for clave, nombre in docs_validacion %}
+                            {% include "core/card_documento.html" with clave=clave nombre=nombre parte="validacion" color="blue" %}
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="flex justify-end pt-4 border-t border-slate-100">
                         <form action="{% url 'generar_informe_validacion' proyecto.id %}" method="post">
                             {% csrf_token %}
-                            <button type="submit" class="bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-bold py-2 px-4 rounded-lg text-xs flex items-center gap-2 shadow-sm transition-all whitespace-nowrap">
-                                <i class="fa-solid fa-magic-wand-sparkles"></i> Generar Borrador
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg text-sm flex items-center gap-2 shadow-md transition">
+                                <i class="fa-solid fa-file-word"></i> Generar Borrador Validación
                             </button>
-                        </form>
-            
-                        <form method="post" enctype="multipart/form-data">
-                            {% csrf_token %}
-                            <input type="hidden" name="subir_archivo" value="true">
-                            <input type="hidden" name="tipo_documento" value="Informe_Val">
-                            <input type="hidden" name="parte" value="validacion">
-                            <label class="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-xs flex items-center gap-2 shadow-md transition-all whitespace-nowrap">
-                                <i class="fa-solid fa-upload"></i> 
-                                {% if 'Informe_Val' in proyecto.datos_validacion %}Reemplazar PDF{% else %}Subir Firmado{% endif %}
-                                <input type="file" name="archivo" accept=".pdf" class="hidden" onchange="this.form.submit()">
-                            </label>
                         </form>
                     </div>
                 </div>
-            </div>
+            </details>
 
-            <section>
-                <div class="flex items-center gap-3 mb-4">
-                    <div class="bg-purple-50 text-purple-600 p-2 rounded-lg"><i class="fa-solid fa-microscope"></i></div>
-                    <h3 class="text-lg font-bold text-slate-700">Estudio</h3>
+            <details class="group bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" open>
+                <summary class="flex items-center justify-between p-5 cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-purple-100 text-purple-600 p-2 rounded-lg"><i class="fa-solid fa-microscope"></i></div>
+                        <h3 class="text-lg font-bold text-slate-700">3. Documentos de Estudio</h3>
+                    </div>
+                    <i class="fa-solid fa-chevron-down text-slate-400 group-open:rotate-180 transition-transform"></i>
+                </summary>
+                
+                <div class="p-5 border-t border-slate-200">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        {% for clave, nombre in docs_estudio %}
+                            {% include "core/card_documento.html" with clave=clave nombre=nombre parte="estudio" color="purple" %}
+                        {% endfor %}
+                    </div>
+
+                    <div class="flex justify-end pt-4 border-t border-slate-100">
+                        <form method="post">
+                            {% csrf_token %}
+                            <button type="submit" name="generar_informe_estudio" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg text-sm flex items-center gap-2 shadow-md transition">
+                                <i class="fa-solid fa-file-word"></i> Generar Borrador Estudio
+                            </button>
+                        </form>
+                    </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {% for clave, nombre in docs_estudio %}
-                        {% include "core/card_documento.html" with clave=clave nombre=nombre parte="estudio" color="purple" %}
-                    {% endfor %}
-                </div>
-            </section>
+            </details>
         </div>
 
         <div class="xl:col-span-1 space-y-6">
             
             <div class="bg-white p-5 rounded-xl border border-emerald-200 shadow-sm">
                 <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <i class="fa-solid fa-file-signature text-emerald-600"></i> Informe Final
+                    <i class="fa-solid fa-file-signature text-emerald-600"></i> PDF Final Firmado
                 </h3>
-
-                <form method="post" class="mb-4">
-                    {% csrf_token %}
-                    <button type="submit" name="generar_informe" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-xs flex items-center justify-center gap-2 border border-slate-300">
-                        <i class="fa-solid fa-file-word text-blue-600"></i> Generar Word
-                    </button>
-                </form>
-
-                <hr class="border-slate-100 my-4">
-
-                <p class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">PDF Firmado</p>
                 
                 {% if proyecto.informe_final_firmado %}
                     <div class="bg-emerald-50 border border-emerald-100 p-3 rounded-lg mb-3">
@@ -272,21 +224,36 @@
                 </form>
             </div>
 
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" style="max-height: 500px;">
-                <div class="bg-slate-50 px-4 py-3 border-b border-slate-200">
-                    <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wider">Audit Trail</h3>
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" style="max-height: 600px;">
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" style="max-height: 600px;">
+                
+                <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wider">Historial y Comentarios</h3>
+                    
+                    <a href="{% url 'exportar_audit_trail_pdf' proyecto.id %}" target="_blank" class="text-xs bg-white border border-slate-300 text-slate-600 hover:text-red-600 hover:border-red-300 px-2 py-1 rounded shadow-sm transition flex items-center gap-1" title="Descargar PDF Oficial">
+                        <i class="fa-solid fa-file-pdf text-red-500"></i> Exportar
+                    </a>
                 </div>
-                <div class="overflow-y-auto p-0 custom-scrollbar flex-1">
+                
+                <div class="overflow-y-auto p-0 custom-scrollbar flex-1 bg-slate-50/50">
+                
+                <div class="overflow-y-auto p-0 custom-scrollbar flex-1 bg-slate-50/50">
                     <table class="w-full text-xs text-left">
                         <tbody class="divide-y divide-slate-100">
                             {% for log in historial %}
-                            <tr class="hover:bg-slate-50">
+                            <tr class="hover:bg-white transition">
                                 <td class="px-4 py-3">
                                     <p class="font-bold text-slate-700">{{ log.usuario.username }}</p>
-                                    <p class="text-[10px] text-slate-400">{{ log.fecha|date:"d/m/Y H:i" }}</p>
+                                    <p class="text-[10px] text-slate-400">{{ log.fecha|date:"d/m H:i" }}</p>
                                 </td>
                                 <td class="px-4 py-3 text-slate-600">
-                                    {{ log.accion }}
+                                    {% if log.comentario %}
+                                        <div class="bg-blue-50 p-2 rounded text-blue-800 border border-blue-100">
+                                            <i class="fa-regular fa-comment-dots mr-1"></i> {{ log.comentario }}
+                                        </div>
+                                    {% else %}
+                                        {{ log.accion }}
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% empty %}
@@ -295,77 +262,52 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div class="p-3 border-t border-slate-200 bg-white">
+                    <form method="post" class="flex gap-2">
+                        {% csrf_token %}
+                        <input type="text" name="comentario_texto" placeholder="Escribe un comentario..." class="flex-1 text-xs border rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" required>
+                        <button type="submit" name="enviar_comentario" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg border border-slate-300">
+                            <i class="fa-solid fa-paper-plane text-xs"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        // 1. Configuración de Toasts
         const Toast = Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-            didOpen: (toast) => {
-                toast.addEventListener('mouseenter', Swal.stopTimer)
-                toast.addEventListener('mouseleave', Swal.resumeTimer)
-            }
+            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true,
+            didOpen: (toast) => { toast.addEventListener('mouseenter', Swal.stopTimer); toast.addEventListener('mouseleave', Swal.resumeTimer); }
         });
-
-        // 2. Disparar Toasts si hay mensajes
         {% if messages %}
             {% for message in messages %}
-                Toast.fire({
-                    icon: "{{ message.tags|default:'info' }}",
-                    title: "{{ message }}"
-                });
+                Toast.fire({ icon: "{{ message.tags|default:'info' }}", title: "{{ message }}" });
             {% endfor %}
         {% endif %}
 
-        // 3. Script para el Texto de Selectividad
         const textosSelectividad = {
-            'opcion1': "El método demostró ser selectivo al no presentar interferencias en los tiempos de retención del analito principal, provenientes del diluyente o placebos analizados.",
-            'opcion2': "Se observaron picos pequeños en el tiempo de retención, pero su respuesta es inferior al 0.5% comparada con el estándar, por lo que se consideran despreciables.",
-            'opcion3': "El método es capaz de separar inequívocamente el principio activo de sus productos de degradación formados bajo condiciones de estrés (ácido, base, oxidación)."
+            {% for just in justificaciones %}
+                '{{ just.id }}': `{{ just.descripcion|escapejs }}`,
+            {% endfor %}
         };
-
         function actualizarTextoSelectividad() {
-            const select = document.getElementById('select_selectividad');
-            const area = document.getElementById('texto_selectividad');
-            if (select && area) {
-                const valor = select.value;
-                if (textosSelectividad[valor]) {
-                    area.value = textosSelectividad[valor];
-                }
-            }
+            const val = document.getElementById('select_selectividad').value;
+            if (textosSelectividad[val]) document.getElementById('texto_selectividad').value = textosSelectividad[val];
         }
 
-        // 4. Lógica del Botón Finalizar
         const btnFinalizar = document.querySelector('button[name="finalizar_proyecto"]');
         if (btnFinalizar) {
             btnFinalizar.addEventListener('click', function(e) {
                 e.preventDefault(); 
-                const form = this.closest('form');
                 Swal.fire({
-                    title: '¿Finalizar Proyecto?',
-                    text: "El proyecto se moverá al histórico y pasará a modo lectura. ¿Estás seguro?",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#10b981', 
-                    cancelButtonColor: '#64748b',  
-                    confirmButtonText: 'Sí, finalizar',
-                    cancelButtonText: 'Cancelar',
-                    reverseButtons: true
+                    title: '¿Finalizar Proyecto?', text: "Pasará a modo histórico.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#10b981', cancelButtonColor: '#64748b', confirmButtonText: 'Sí, finalizar'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        const hiddenInput = document.createElement('input');
-                        hiddenInput.type = 'hidden';
-                        hiddenInput.name = 'finalizar_proyecto';
-                        hiddenInput.value = 'true';
-                        form.appendChild(hiddenInput);
-                        form.submit();
+                        const input = document.createElement('input'); input.type = 'hidden'; input.name = 'finalizar_proyecto'; input.value = 'true';
+                        this.closest('form').appendChild(input).parentElement.submit();
                     }
                 });
             });

@@ -4,46 +4,40 @@ register = template.Library()
 
 @register.filter
 def get_item(dictionary, key):
-    """
-    Retorna el valor de un diccionario usando una clave dinámica.
-    Devuelve el objeto real (dict) para permitir acceso a atributos anidados.
-    """
     if not isinstance(dictionary, dict):
         return None
     return dictionary.get(key)
 
 @register.filter
 def calcular_progreso(proyecto):
-    """
-    Calcula el porcentaje de avance del proyecto basado en documentos cargados.
-    """
     # 1. Si ya está terminado o tiene PDF final firmado -> 100%
     if proyecto.estado == 'terminado' or proyecto.informe_final_firmado:
         return 100
 
-    # 2. Lista de documentos clave que suman puntos
-    # (Basado en los 6 Excels principales + Protocolo + Informe)
-    documentos_clave = [
-        '01_LS', '02_IF', '03_Estabilidad', 
-        '04_LM', '05_R', '06_S', 
-        'Protocolo_Val', 'Informe_Val'
-    ]
+    # 2. Definir Listas de Requisitos
+    docs_validacion_req = ['01_LS', '02_IF', '03_Estabilidad', '04_LM', '05_R', '06_S', 'Protocolo_Val']
+    docs_estudio_req = ['Factor_Similitud', 'Porcentaje_Disuelto', 'Protocolo_Perfiles']
     
-    total_docs = len(documentos_clave)
+    # 3. Contar cumplimiento
+    total_items = len(docs_validacion_req) + len(docs_estudio_req) + 1 # +1 por la Configuración
     encontrados = 0
     
-    # Verificamos cuántos de estos existen en los datos guardados
-    datos = proyecto.datos_validacion
-    if datos and isinstance(datos, dict):
-        for doc in documentos_clave:
-            if doc in datos:
-                encontrados += 1
+    # Verificar Validación
+    datos_val = proyecto.datos_validacion
+    if datos_val:
+        for doc in docs_validacion_req:
+            if doc in datos_val: encontrados += 1
+        # Verificar Configuración (Datos Generales)
+        if 'datos_generales' in datos_val: encontrados += 1
+
+    # Verificar Estudio
+    datos_est = proyecto.datos_estudio
+    if datos_est:
+        for doc in docs_estudio_req:
+            if doc in datos_est: encontrados += 1
     
-    # 3. Calculamos porcentaje (Tope 90% si no está firmado)
-    # Si tiene todo cargado pero no firmado, se queda en 90%
-    if encontrados == 0:
-        return 5 # Un 5% de "cortesía" por haber creado el proyecto
+    # 4. Cálculo final (Tope 95% hasta que se firme)
+    if encontrados == 0: return 5
     
-    porcentaje = int((encontrados / total_docs) * 90)
-    
-    return porcentaje
+    porcentaje = int((encontrados / total_items) * 95)
+    return min(porcentaje, 95)

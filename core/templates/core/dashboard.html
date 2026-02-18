@@ -22,16 +22,28 @@
             <span class="font-bold text-slate-700 hidden md:block">Gestión de Disolución</span>
         </div>
         <div class="flex items-center gap-4">
+            
+            {% if user.is_superuser %}
+            <a href="{% url 'administrar_usuarios' %}" class="text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors">
+                <i class="fa-solid fa-users-gear"></i> Usuarios
+            </a>
+            <div class="h-6 w-px bg-slate-300"></div>
+            {% endif %}
+
             <a href="{% url 'crear_proyecto' %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-colors flex items-center gap-2">
                 <i class="fa-solid fa-plus"></i> <span class="hidden sm:inline">Nuevo Proyecto</span>
             </a>
+            
             <div class="h-8 w-px bg-slate-300"></div>
             
             <div class="flex items-center gap-3">
-                <span class="text-sm font-semibold text-slate-600">{{ user.username }}</span>
+                <div class="text-right leading-tight hidden sm:block">
+                    <p class="text-sm font-bold text-slate-700">{{ user.first_name }}</p>
+                    <p class="text-[10px] text-slate-400 font-mono">{{ user.username }}</p>
+                </div>
                 <form action="{% url 'logout' %}" method="post">
                     {% csrf_token %}
-                    <button type="submit" class="text-slate-400 hover:text-red-500 transition-colors" title="Cerrar Sesión">
+                    <button type="submit" class="text-slate-400 hover:text-red-500 transition-colors p-2" title="Cerrar Sesión">
                         <i class="fa-solid fa-right-from-bracket text-lg"></i>
                     </button>
                 </form>
@@ -42,120 +54,126 @@
     <div class="flex-1 max-w-[1600px] w-full mx-auto p-6 grid grid-cols-1 xl:grid-cols-3 gap-8 overflow-hidden">
         
         <div class="xl:col-span-2 flex flex-col gap-4 h-full overflow-hidden">
-            <h2 class="text-xl font-bold text-slate-700 flex items-center gap-2 shrink-0">
-                <i class="fa-solid fa-person-digging text-blue-500"></i> En Proceso
-            </h2>
+            <div class="flex justify-between items-end shrink-0">
+                <h2 class="text-xl font-bold text-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-person-digging text-blue-500"></i> En Proceso
+                </h2>
+                <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">{{ en_proceso.count }} Activos</span>
+            </div>
             
             <div class="overflow-y-auto pr-2 custom-scrollbar pb-10">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {% for p in proyectos %}
-                        {% if p.estado == 'en_proceso' %}
-                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-1 rounded">Activo</span>
-                                <span class="text-xs text-slate-400">#{{ p.id }}</span>
-                            </div>
-                            <h3 class="font-bold text-lg text-slate-800 mb-1 truncate">{{ p.titulo }}</h3>
-                            <p class="text-sm text-slate-500 mb-4"><i class="fa-solid fa-user-tie mr-1"></i> {{ p.nombre_analista|default:"Sin asignar" }}</p>
-                            
-                            <div class="flex gap-2 mt-4">
-                                <a href="{% url 'detalle_proyecto' p.id %}" class="flex-1 text-center bg-slate-50 border border-slate-200 text-slate-600 font-semibold py-2 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                                    Gestionar
-                                </a>
-                                
-                                {% if user.is_superuser %}
-                                <form action="{% url 'eliminar_proyecto' p.id %}" method="post" class="form-eliminar">
-                                    {% csrf_token %}
-                                    <button type="button" onclick="confirmarEliminacion(this)" class="h-full px-3 bg-red-50 text-red-500 border border-red-200 rounded-lg hover:bg-red-600 hover:text-white transition-colors" title="Eliminar Proyecto">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                            </div>
+                    {% for p in en_proceso %}
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group relative">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-1 rounded">Activo</span>
+                            <span class="text-xs text-slate-400">#{{ p.id }}</span>
                         </div>
-                        {% endif %}
+                        <h3 class="font-bold text-lg text-slate-800 mb-1 truncate">{{ p.titulo }}</h3>
+                        <p class="text-sm text-slate-500 mb-4"><i class="fa-solid fa-user-tie mr-1"></i> {{ p.nombre_analista|default:"Sin asignar" }}</p>
+                        
+                        <div class="flex gap-2 mt-4">
+                            <a href="{% url 'detalle_proyecto' p.id %}" class="flex-1 text-center bg-slate-50 border border-slate-200 text-slate-600 font-semibold py-2 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                                Gestionar
+                            </a>
+                            
+                            {% if user.is_superuser %}
+                            <form action="{% url 'eliminar_proyecto' p.id %}" method="post" class="form-eliminar">
+                                {% csrf_token %}
+                                <button type="button" onclick="confirmarEliminacion(this)" class="h-full px-3 bg-red-50 text-red-500 border border-red-200 rounded-lg hover:bg-red-600 hover:text-white transition-colors" title="Eliminar Proyecto">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-span-2 text-center py-10 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
+                        <p class="text-slate-400">No hay proyectos activos.</p>
+                        <a href="{% url 'crear_proyecto' %}" class="text-blue-600 font-bold hover:underline mt-2 inline-block">¡Crea el primero!</a>
+                    </div>
                     {% endfor %}
                 </div>
             </div>
         </div>
 
         <div class="bg-slate-200/50 rounded-2xl p-4 flex flex-col gap-4 border border-slate-300/50 h-full overflow-hidden">
-            <h2 class="text-xl font-bold text-slate-700 flex items-center gap-2 shrink-0">
-                <i class="fa-solid fa-box-archive text-emerald-600"></i> Terminados
-            </h2>
+            
+            <div class="shrink-0 space-y-3">
+                <h2 class="text-xl font-bold text-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-box-archive text-emerald-600"></i> Histórico
+                </h2>
+                
+                <form method="get" class="relative">
+                    <input type="text" name="q" value="{{ busqueda|default:'' }}" 
+                           placeholder="Buscar por lote o analista..." 
+                           class="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
+                    <i class="fa-solid fa-search absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+                    
+                    {% if busqueda %}
+                    <a href="{% url 'lista_proyectos' %}" class="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600 bg-slate-100 px-2 rounded text-xs py-1" title="Limpiar filtro">
+                        <i class="fa-solid fa-xmark"></i>
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
             
             <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-3">
-                {% for p in proyectos %}
-                    {% if p.estado == 'terminado' %}
-                    <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 opacity-90 hover:opacity-100 transition-opacity shrink-0">
-                        <div class="flex justify-between items-start mb-1">
-                            <h3 class="font-bold text-slate-700 text-sm truncate w-3/4">{{ p.titulo }}</h3>
-                            <i class="fa-solid fa-check-circle text-emerald-500"></i>
-                        </div>
-                        <p class="text-xs text-slate-500 mb-2">{{ p.nombre_analista }}</p>
-                        
-                        <div class="flex gap-2 mt-2">
-                            <a href="{% url 'detalle_proyecto' p.id %}" class="flex-1 bg-slate-50 text-slate-600 text-xs font-bold py-1.5 rounded text-center hover:bg-slate-100 border">
-                                Consultar
-                            </a>
-                            {% if p.informe_final_firmado %}
-                            <a href="{{ p.informe_final_firmado.url }}" target="_blank" class="bg-emerald-50 text-emerald-600 px-2 py-1.5 rounded border border-emerald-100 hover:bg-emerald-100" title="Ver PDF Firmado">
-                                <i class="fa-solid fa-file-pdf"></i>
-                            </a>
-                            {% endif %}
-                        </div>
+                {% for p in terminados %}
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 opacity-90 hover:opacity-100 transition-opacity shrink-0">
+                    <div class="flex justify-between items-start mb-1">
+                        <h3 class="font-bold text-slate-700 text-sm truncate w-3/4" title="{{ p.titulo }}">{{ p.titulo }}</h3>
+                        <i class="fa-solid fa-check-circle text-emerald-500"></i>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-2">{{ p.nombre_analista }}</p>
+                    <p class="text-[10px] text-slate-400 mb-2 text-right">Finalizado: {{ p.fecha_subida_firmado|date:"d M Y"|default:"--" }}</p>
+                    
+                    <div class="flex gap-2 mt-2">
+                        <a href="{% url 'detalle_proyecto' p.id %}" class="flex-1 bg-slate-50 text-slate-600 text-xs font-bold py-1.5 rounded text-center hover:bg-slate-100 border">
+                            Consultar
+                        </a>
+                        {% if p.informe_final_firmado %}
+                        <a href="{{ p.informe_final_firmado.url }}" target="_blank" class="bg-emerald-50 text-emerald-600 px-2 py-1.5 rounded border border-emerald-100 hover:bg-emerald-100" title="Ver PDF Firmado">
+                            <i class="fa-solid fa-file-pdf"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                    {% if busqueda %}
+                    <div class="text-center py-10 text-slate-500 text-sm">
+                        <i class="fa-solid fa-filter-circle-xmark text-2xl mb-2 text-slate-300"></i><br>
+                        No se encontraron resultados para "<b>{{ busqueda }}</b>"
+                    </div>
+                    {% else %}
+                    <div class="text-center py-10 text-slate-400 text-sm italic">
+                        No hay proyectos históricos aún.
                     </div>
                     {% endif %}
                 {% endfor %}
-                
-                <div class="text-center py-10 text-slate-400 text-sm italic hidden last:block">
-                    No hay proyectos históricos.
-                </div>
             </div>
         </div>
+
     </div>
 
     <script>
-        // A. Configuración de los "Toasts" (Notificaciones)
         const Toast = Swal.mixin({
-            toast: true,
-            position: 'top-end',
-            showConfirmButton: false,
-            timer: 3000,
-            timerProgressBar: true,
-            didOpen: (toast) => {
-                toast.addEventListener('mouseenter', Swal.stopTimer)
-                toast.addEventListener('mouseleave', Swal.resumeTimer)
-            }
+            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true,
+            didOpen: (toast) => { toast.addEventListener('mouseenter', Swal.stopTimer); toast.addEventListener('mouseleave', Swal.resumeTimer); }
         });
 
-        // B. Leer mensajes de Django y mostrarlos
         {% if messages %}
             {% for message in messages %}
-                Toast.fire({
-                    icon: "{{ message.tags|default:'info' }}", 
-                    title: "{{ message }}"
-                });
+                Toast.fire({ icon: "{{ message.tags|default:'info' }}", title: "{{ message }}" });
             {% endfor %}
         {% endif %}
 
-        // C. Función para confirmar eliminación
         function confirmarEliminacion(boton) {
             Swal.fire({
-                title: '¿Estás seguro?',
-                text: "¡No podrás revertir esto! Se borrarán todos los archivos y datos.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#ef4444', // Rojo
-                cancelButtonColor: '#3b82f6', // Azul
-                confirmButtonText: 'Sí, eliminar',
-                cancelButtonText: 'Cancelar',
-                reverseButtons: true
+                title: '¿Estás seguro?', text: "Se borrará todo permanentemente.", icon: 'warning', showCancelButton: true,
+                confirmButtonColor: '#ef4444', cancelButtonColor: '#3b82f6', confirmButtonText: 'Sí, eliminar'
             }).then((result) => {
-                if (result.isConfirmed) {
-                    // Si dice que sí, enviamos el formulario padre del botón
-                    boton.closest('form').submit();
-                }
+                if (result.isConfirmed) boton.closest('form').submit();
             })
         }
     </script>

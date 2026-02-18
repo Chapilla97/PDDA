@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page {
+            size: letter;
+            margin: 2cm;
+            @frame footer_frame {           /* Footer estático */
+                -pdf-frame-content: footerContent;
+                bottom: 1cm;
+                margin-left: 2cm;
+                margin-right: 2cm;
+                height: 1cm;
+            }
+        }
+        body { font-family: Helvetica, sans-serif; color: #333; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0056b3; padding-bottom: 10px; }
+        .header h1 { color: #0056b3; margin: 0; font-size: 18pt; }
+        .header p { margin: 2px 0; font-size: 10pt; color: #666; }
+        
+        .info-box { background-color: #f8f9fa; border: 1px solid #ddd; padding: 10px; margin-bottom: 20px; border-radius: 5px; }
+        .info-row { margin-bottom: 5px; font-size: 11pt; }
+        .label { font-weight: bold; color: #555; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }
+        th { background-color: #0056b3; color: white; padding: 8px; text-align: left; font-weight: bold; }
+        td { border-bottom: 1px solid #eee; padding: 8px; vertical-align: top; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        
+        .meta { font-size: 8pt; color: #888; text-align: right; }
+        .comment { color: #0056b3; font-style: italic; display: block; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Reporte de Auditoría (Audit Trail)</h1>
+        <p>Sistema LIMS - Gestión de Disolución</p>
+    </div>
+
+    <div class="info-box">
+        <div class="info-row"><span class="label">Proyecto / Lote:</span> {{ proyecto.titulo }}</div>
+        <div class="info-row"><span class="label">Analista Asignado:</span> {{ proyecto.nombre_analista }}</div>
+        <div class="info-row"><span class="label">Fecha de Creación:</span> {{ proyecto.fecha_creacion|date:"d/m/Y H:i" }}</div>
+        <div class="info-row"><span class="label">Estado Actual:</span> {{ proyecto.get_estado_display }}</div>
+    </div>
+
+    <h3>Historial de Eventos</h3>
+    <table>
+        <thead>
+            <tr>
+                <th width="20%">Fecha / Hora</th>
+                <th width="25%">Usuario</th>
+                <th width="55%">Acción / Detalles</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in historial %}
+            <tr>
+                <td>{{ log.fecha|date:"d/m/Y" }}<br><span style="color:#666">{{ log.fecha|date:"H:i:s" }}</span></td>
+                <td>
+                    <b>{{ log.usuario.first_name }} {{ log.usuario.last_name }}</b><br>
+                    <span style="color:#666">({{ log.usuario.username }})</span>
+                </td>
+                <td>
+                    {{ log.accion }}
+                    {% if log.comentario %}
+                        <span class="comment">💬 Nota: {{ log.comentario }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" style="text-align:center">Sin registros disponibles.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div id="footerContent" style="text-align: right; font-size: 8pt; color: #aaa;">
+        Página <pdf:pagenumber> | Generado el: {% now "d/m/Y H:i" %}
+    </div>
+</body>
+</html>
