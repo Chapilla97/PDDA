@@ -1,5 +1,6 @@
 from django import template
-
+import json
+from datetime import datetime
 register = template.Library()
 
 @register.filter
@@ -41,3 +42,16 @@ def calcular_progreso(proyecto):
     
     porcentaje = int((encontrados / total_items) * 95)
     return min(porcentaje, 95)
+def get_item(dictionary, key):
+    """Permite obtener un valor de un diccionario usando una variable como clave"""
+    if isinstance(dictionary, dict):
+        return dictionary.get(key)
+    return None
+
+@register.filter
+def parse_iso(date_string):
+    """Convierte fecha ISO string a objeto datetime para formatear en HTML"""
+    try:
+        if not date_string: return None
+        return datetime.fromisoformat(date_string)
+    except: return None
