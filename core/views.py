@@ -105,24 +105,27 @@ def extraer_tags_de_archivo(archivo_en_memoria):
 def detectar_tipo_doc(filename):
     fname_clean = os.path.splitext(filename.lower())[0]
     fname_full = filename.lower() 
+    
+    # El orden importa: Primero buscamos los Protocolos para que no se confundan con las hojas
     mapa = {
+        'Protocolo_Val': ['protocolo val', 'validacion', 'validación'],
+        'Protocolo_Perfiles': ['protocolo perfiles', 'protocolo estudio', 'protocolo para estudios', 'ds-001'],
         '01_LS': ['01 ls', '01_ls', 'sistema'], 
         '02_IF': ['02 if', '02_if'],
         '03_Estabilidad': ['03', 'estabilidad'],
         '04_LM': ['04 lm', '04_lm', '04-lm'],
         '05_R': ['05 r', '05_r', '05-r'],
         '06_S': ['06 s', '06_s', '06-s'],
-        'Protocolo_Val': ['protocolo val', 'validacion', 'validación'],
-        'Factor_Similitud': ['factor', 'f2', 'similitud'],
-        'Porcentaje_Disuelto': ['disuelto', '%', 'perfiles'],
-        'Protocolo_Perfiles': ['protocolo perfiles', 'protocolo estudio']
+        'Factor_Similitud': ['factor', 'f2', 'similitud', 'ds-008'],
+        'Porcentaje_Disuelto': ['disuelto', '% disuelto', 'ds-005'] # Quitamos la palabra "perfiles" de aquí
     }
+    
     for clave, keywords in mapa.items():
         for kw in keywords:
             if kw in fname_clean: return clave
             if 'Protocolo' in clave and kw in fname_full: return clave
+            
     return None
-
 def evaluar_criterio(valor_str, operador, limite):
     try:
         if not valor_str or valor_str == "": return "-"
@@ -219,7 +222,12 @@ def detalle_proyecto(request, proyecto_id):
                 manual_update = True
 
             if archivos_procesados or manual_update:
-                proyecto.save()
+                if isinstance(proyecto.datos_validacion, dict): proyecto.datos_validacion = dict(proyecto.datos_validacion)
+                if isinstance(proyecto.datos_estudio, dict): proyecto.datos_estudio = dict(proyecto.datos_estudio)
+                # -------------------------------------------------------
+                
+                proyecto.save()  # <--- Esta línea ya la tenías
+                msg = f"✅ Procesados {len(archivos_procesados)} archivos."
                 msg = f"✅ Procesados {len(archivos_procesados)} archivos."
                 if archivos_ignorados: msg += f" ⚠️ Ignorados: {', '.join(archivos_ignorados)}"
                 registrar_log(proyecto, request.user, f"Carga masiva: {', '.join(archivos_procesados)}")
@@ -263,12 +271,8 @@ def detalle_proyecto(request, proyecto_id):
             return redirect('detalle_proyecto', proyecto_id=proyecto.id)
 
         if 'generar_informe_estudio' in request.POST:
-            registrar_log(proyecto, request.user, "Generó Borrador de Estudio")
-            datos_finales = {**proyecto.datos_validacion, **proyecto.datos_estudio}
-            datos_planos = {}
-            for doc in datos_finales.values():
-                if isinstance(doc, dict): datos_planos.update(doc)
-            return generar_documento_descarga(datos_planos, proyecto.titulo)
+            # === AQUÍ LLAMAMOS A LA NUEVA FUNCIÓN ===
+            return generar_documento_estudio(proyecto, request)
 
         if 'subir_pdf_firmado' in request.POST:
             archivo = request.FILES.get('archivo_pdf')
@@ -304,6 +308,9 @@ def detalle_proyecto(request, proyecto_id):
     justificaciones = JustificacionSelectividad.objects.filter(activo=True)
     return render(request, 'core/detalle_proyecto.html', {'proyecto': proyecto, 'docs_validacion': docs_validacion, 'docs_estudio': docs_estudio, 'historial': historial, 'equipos': equipos, 'justificaciones': justificaciones})
 
+class SilentUndefined(Undefined):
+    def __str__(self): return ""
+
 def generar_documento_descarga(contexto_datos, titulo_proyecto=""):
     ruta_plantilla = os.path.join(settings.BASE_DIR, 'Plantilla_Informe.docx')
     if not os.path.exists(ruta_plantilla): return HttpResponse("Falta Plantilla_Informe.docx", status=404)
@@ -316,8 +323,95 @@ def generar_documento_descarga(contexto_datos, titulo_proyecto=""):
     doc.save(response)
     return response
 
-class SilentUndefined(Undefined):
-    def __str__(self): return ""
+# =========================================================================
+# NUEVA FUNCIÓN PARA EL INFORME DE ESTUDIO (PERFILES)
+# =========================================================================
+def generar_documento_estudio(proyecto, request):
+    ruta_plantilla = os.path.join(settings.BASE_DIR, 'Plantilla_Estudio.docx')
+    if not os.path.exists(ruta_plantilla): 
+        return HttpResponse("Falta Plantilla_Estudio.docx en la raíz del proyecto", status=404)
+        
+    doc = DocxTemplate(ruta_plantilla)
+    # jinja_env = Environment(undefined=SilentUndefined)
+    
+    # 1. Aplanar todos los datos de estudio
+    datos = {}
+    if isinstance(proyecto.datos_estudio, dict):
+        for doc_datos in proyecto.datos_estudio.values():
+            if isinstance(doc_datos, dict): datos.update(doc_datos)
+            
+    # Traemos también los generales por si los ocupas (fechas, etc)
+    if isinstance(proyecto.datos_validacion, dict) and 'datos_generales' in proyecto.datos_validacion:
+        datos.update(proyecto.datos_validacion['datos_generales'])
+        
+    # 2. Lógica Normativa NOM-177 (%CV)
+    # IMPORTANTE: Asegúrate de nombrar los rangos en Excel como "cv_10_pba", "cv_20_pba", etc.
+    tiempos = [10, 20, 30, 60, 90, 120]
+    try:
+        cv_10 = float(datos.get('cv_10_pba', 0))
+        cv_subsecuentes = [float(datos.get(f'cv_{t}_pba', 0)) for t in tiempos[1:]]
+        
+        cumple_norma_cv = True
+        if cv_10 > 20.0 or any(cv > 10.0 for cv in cv_subsecuentes):
+            cumple_norma_cv = False
+            
+        if cumple_norma_cv:
+            datos['texto_evaluacion'] = "se realiza la prueba de factor de similitud f2, demostrándose que los perfiles de disolución son similares al encontrar que el factor f2 es mayor a 50."
+        else:
+            datos['texto_evaluacion'] = "se emplea el método de Distancia de Mahalanobis debido a que la variabilidad de los datos excede los límites establecidos para aplicar f2."
+    except Exception:
+        datos['texto_evaluacion'] = "se realiza la prueba de factor de similitud f2 (Nota: Verifique los rangos de CV% en el Excel)."
+
+    # 3. Reconstrucción dinámica de las tablas de perfiles (12 vasos)
+    # Permite inyectarlos usando {% tr for perfil in perfiles_prueba %}
+    perfiles_prueba = []
+    perfiles_referencia = []
+    for vaso in range(1, 13):
+        perfil_pba = {'vaso': vaso}
+        perfil_ref = {'vaso': vaso}
+        for t in tiempos:
+            perfil_pba[f't{t}'] = datos.get(f'v{vaso}_{t}_pba', '')
+            perfil_ref[f't{t}'] = datos.get(f'v{vaso}_{t}_ref', '')
+        perfiles_prueba.append(perfil_pba)
+        perfiles_referencia.append(perfil_ref)
+        
+    datos['perfiles_prueba'] = perfiles_prueba
+    datos['perfiles_referencia'] = perfiles_referencia
+
+    # 4. Generación de Gráfica Promedio al Vuelo
+    try:
+        plt.figure(figsize=(8, 5))
+        promedios_ref = [float(datos.get(f'prom_{t}_ref', 0)) for t in tiempos]
+        promedios_prueba = [float(datos.get(f'prom_{t}_pba', 0)) for t in tiempos]
+        
+        plt.plot(tiempos, promedios_ref, marker='o', label='Referencia', color='#005a87')
+        plt.plot(tiempos, promedios_prueba, marker='s', label='Prueba', color='#ff9900', linestyle='--')
+        
+        plt.title('Perfil de disolución promedio')
+        plt.xlabel('Tiempo (minutos)')
+        plt.ylabel('Porcentaje disuelto (%)')
+        plt.legend()
+        plt.grid(True, linestyle=':', alpha=0.5)
+        plt.tight_layout()
+        
+        mem_grafica = io.BytesIO()
+        plt.savefig(mem_grafica, format='png', dpi=150)
+        mem_grafica.seek(0)
+        datos['grafica_promedio'] = InlineImage(doc, mem_grafica, width=Mm(150))
+        plt.close()
+    except Exception as e:
+        pass # Si hay error en los datos, genera el word sin romper el sistema
+
+    contexto = {k: v for k, v in datos.items() if type(v) != dict}
+    
+    doc.render(contexto)
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    response['Content-Disposition'] = f'attachment; filename="Borrador_Estudio_{proyecto.titulo}.docx"'
+    doc.save(response)
+    
+    registrar_log(proyecto, request.user, "Generó Borrador de Estudio con Gráfica y NOM-177")
+    return response
+
 
 @login_required
 def generar_informe_validacion(request, proyecto_id):
@@ -400,7 +494,6 @@ def generar_informe_validacion(request, proyecto_id):
         doc = DocxTemplate(ruta_plantilla)
         jinja_env = Environment(undefined=SilentUndefined)
 
-        # --- FUNCIÓN HELPER PARA GENERAR GRÁFICAS ---
         def crear_grafica_linealidad(prefijo_conc, prefijo_resp, prefijo_resul):
             try:
                 plt.figure(figsize=(6.5, 4.5))
